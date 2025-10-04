@@ -1,0 +1,424 @@
+<?php
+	include('../util/database.php');
+	include('../util/numerosALetras.php');
+	session_start();
+	
+	$idComprobante = $_POST['id'];
+	$montoPagado   = "";
+
+	$selectComprobante = "
+	    SELECT com.id, IF(com.num_comprobante > 0, CONCAT(com.ser_comprobante, '-', LPAD(com.num_comprobante, 6, '0')), '') AS num_comprobante, 
+	        com.id_cliente, cli.tip_documento, cli.num_documento, par2.descripcion AS des_tipo_documento, 
+			CONCAT_WS(' ', cli.nombre_razon_social, cli.seg_nombre, cli.pri_apellido, cli.seg_apellido) AS nombre_razon_social, 
+			cli.direccion, com.tip_comprobante, par1.descripcion AS des_comprobante, par3.descripcion AS des_med_pago, 
+			com.guia_remision, DATE_FORMAT(com.fec_emision, '%d/%m/%Y') AS fec_emision, com.ord_compra, 
+			com.observaciones, com.pagado, com.emitido, com.par_medio_pago, com.condicion_pago, 
+			IF(com.desc_medio_pago = '', com.condicion_pago, com.desc_medio_pago) as desc_medio_pago, 
+			com.aplica_detraccion, par4.descripcion AS desc_aplica_detraccion, 
+			com.por_detraccion, 
+			com.tip_detraccion, par5.descripcion AS desc_tip_detraccion, com.mon_detraccion, 
+			com.cod_medio_pago_detraccion, par6.descripcion AS desc_medio_pago_detraccion,
+			IF(com.condicion_pago in ('2', 'CREDITO'), 'CREDITO', 'CONTADO') AS tipo_pago
+		FROM comprobantes com
+		JOIN clientes cli ON cli.id = com.id_cliente
+		JOIN parametros par1 ON par1.codigo = com.tip_comprobante AND par1.padre = 8
+		JOIN parametros par2 ON par2.codigo = cli.tip_documento AND par2.padre = 12
+		LEFT JOIN parametros par3 ON par3.codigo = com.par_medio_pago AND par3.padre = 4 
+		LEFT JOIN parametros par4 ON par4.abreviatura = com.aplica_detraccion AND par4.padre = 42 /*aplica detracción*/
+		LEFT JOIN parametros par5 ON par5.codigo = com.tip_detraccion AND par5.padre = 68 /*tipo de detracción*/
+		LEFT JOIN parametros par6 ON par6.codigo = com.cod_medio_pago_detraccion AND par6.padre = 45 /*medio pago detracción*/
+		WHERE com.id = '$idComprobante'";
+			
+	$selectCuotas = "
+	    SELECT cuo.id, cuo.id_comprobante, DATE_FORMAT(cuo.fecha, '%Y-%m-%d') AS fecha, cuo.monto 
+        FROM cuotas cuo 
+        WHERE cuo.id_comprobante = '$idComprobante'";
+
+	$selectDetComprobante = "
+	    SELECT dcom.id_producto, pro.descripcion AS des_producto, dcom.cantidad, 
+			dcom.precio AS precio_unitario, dcom.precio*dcom.cantidad_final precio_total, pro.unidad_medida, 
+			dcom.espesor, dcom.ancho, dcom.largo, dcom.cantidad_final 
+		FROM det_comprobante dcom
+		JOIN productos pro ON pro.id = dcom.id_producto
+		WHERE dcom.id_comprobante = '$idComprobante'";
+				
+	$selectPagos = "
+	    SELECT pag.codigo_medio_pago, pag.monto 
+		FROM pagos pag 
+		WHERE pag.id_comprobante = '$idComprobante'";
+	
+	if (!$resultSelectComprobante = mysqli_query($con, $selectComprobante)) {
+		exit(mysqli_error($con));
+	}
+	
+	if (!$resultSelectCuotas = mysqli_query($con, $selectCuotas)) 
+	{
+		exit(mysqli_error($con));
+	}
+	
+	if (!$resultSelectDetComprobante = mysqli_query($con, $selectDetComprobante)) {
+		exit(mysqli_error($con));
+	}
+	
+    if(isset($_POST['id'])) {
+		$disabled = "";
+		$readOnly = "";
+		
+		if(mysqli_num_rows($resultSelectComprobante) > 0) {
+			while ($rowSelectComprobante = mysqli_fetch_assoc($resultSelectComprobante)) {
+				$disabled = ($rowSelectComprobante['emitido'] == "1") ? "disabled" : "";
+				$readOnly = ($rowSelectComprobante['emitido'] == "1") ? "readOnly" : "";
+				$condicionPago = $rowSelectComprobante['condicion_pago'];
+				$tipoPago = (intval($condicionPago) === 2) ? 'CREDITO' : 'CONTADO';
+				$tipoPago = $rowSelectComprobante['tipo_pago'];
+				// Para depuración
+				$debugInfo = "Condición de pago: $condicionPago | Tipo: $tipoPago | Emitido: " . $rowSelectComprobante['emitido'];
+?>
+		<div class="modal-dialog" style="width:70% !important;" role="document">
+			<div class="modal-content">
+				<div class="modal-header">
+				    <!-- <?php echo $debugInfo; ?> -->
+		<?php
+			if ($rowSelectComprobante['tip_comprobante'] == 5) 
+			{
+		?>
+					<form method="post" onsubmit="document.getElementById('submit-comprobante').disabled=true;" action="../../ajax/comprobantes/emitirTicket.php" target="_blank" >
+		<?php 
+			} 
+			else 
+			{
+		?>
+					<form method="post" onsubmit="document.getElementById('submit-comprobante').disabled=true;" action="../../ajax/comprobantes/emitirComprobante.php" target="_blank" >
+		<?php 
+			}
+		?>
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+						
+						<h4 class="modal-title" id="myModalLabel"><?php echo $rowSelectComprobante['des_comprobante'].': '.$rowSelectComprobante['num_comprobante']; ?></h4>
+						<div class="panel-body">
+							<!--div class="col-lg-4 col-mb-6 col-sm-12"-->
+							<div class="col-lg-8 col-mb-8 col-sm-12">
+								<div class="col-lg-6 col-mb-12 col-sm-12">
+									<label for="tip-documento"><?php echo $rowSelectComprobante['des_tipo_documento']; ?></label>
+								    <input class="form-control" type="text" id="tip-documento" name="tip-documento" value="<?php echo $rowSelectComprobante['num_documento']; ?>" readonly disabled />
+								</div>
+								<div class="col-lg-6 col-mb-12 col-sm-12">
+									<label for="fec-emision">Fecha de emisión</label>
+									<input class="form-control" type="text" id="fec-emision" name="fec-emision" value="<?php echo $rowSelectComprobante['fec_emision']; ?>" readonly disabled />
+								</div>
+								<!--label for="tip-documento"><?php //echo $rowSelectComprobante['des_tipo_documento']; ?></label>
+								<input class="form-control" type="text" id="tip-documento" name="tip-documento" value="<?php //echo $rowSelectComprobante['num_documento']; ?>" readonly disabled /-->
+							</div>
+						</div>
+						<div class="panel-body">
+							<div class="col-lg-8 col-mb-8 col-sm-12">
+								<div class="col-lg-12 col-mb-12 col-sm-12">
+									<label for="nombre">Nombre/Razón Social</label>
+									<input class="form-control" type="text" id="nombre" name="nombre" value="<?php echo $rowSelectComprobante['nombre_razon_social']; ?>" readonly disabled />
+								</div>
+								<div class="col-lg-12 col-mb-12 col-sm-12">
+									<label for="direccion">Dirección</label>
+									<input class="form-control" type="text" id="direccion" name="direccion" value="<?php echo $rowSelectComprobante['direccion']; ?>" readonly disabled />
+								</div>
+								<div class="col-lg-6 col-mb-12 col-sm-12">
+									<label for="guia-remision">Guía de remisión</label>
+									<input class="form-control" type="text" id="guia-remision" name="guia-remision" value="<?php echo $rowSelectComprobante['guia_remision']; ?>" readonly disabled />
+								</div>
+								<div class="col-lg-6 col-mb-12 col-sm-12">
+									<label for="orden-compra">Orden de compra</label>
+									<input class="form-control" type="text" id="orden-compra" name="orden-compra" value="<?php echo $rowSelectComprobante['ord_compra']; ?>" readonly disabled />
+								</div>
+    							<!--********************************************************************-->
+    							
+    							<div class="col-lg-6 col-mb-12 col-sm-12">
+    								<label for="condicion-pago">Condición de pago</label>
+    								<input class="form-control" type="text" id="desc-condicion-pago" name="desc-condicion-pago" value="<?php echo $rowSelectComprobante['desc_medio_pago']; ?>" 
+    								    readonly disabled />
+					                <input type="hidden" id="condicion-pago" name="condicion-pago" value="<?php echo $rowSelectComprobante['condicion_pago']; ?>" />
+    							</div>
+    							<div class="col-lg-3 col-mb-12 col-sm-12" id="div-agregar-cuotas" style="display:none;">
+    								<label>&nbsp;</label>
+    								<button type="button" id="btn-cuotas" class="form-control btn btn-success" data-toggle="modal" data-target="#mod-agregar-cuota" title="agregar cuotas" 
+    								    readonly disabled><i class="fa fa-plus"></i> Agregar cuotas</button>
+    							</div>
+    							
+    							<!--********************************************************************-->
+								<div class="col-lg-12 col-mb-12 col-sm-12">
+									<label for="observaciones">Observaciones</label>
+									<textarea class="form-control" rows="4" id="observaciones" name="observaciones" <?php echo $readOnly; ?> ><?php echo $rowSelectComprobante['observaciones']; ?>
+									    </textarea>
+								</div>
+							</div>
+							<!-- DEBUG: Condición de pago: <?php echo $condicionPago; ?> - Desc: <?php echo $rowSelectComprobante['desc_medio_pago']; ?> - Tipo: <?php echo $tipoPago; ?> -->
+							<div class="col-lg-4 col-mb-4 col-sm-12" id="div-medio-pago" style="<?php echo ($tipoPago == 'CREDITO') ? 'display:none;' : ''; ?>">
+								<div class="col-lg-12 col-mb-12 col-sm-12">
+									<label>Medio de pago</label>
+								</div>
+								<?php 
+									$query = 'SELECT par.* FROM parametros par WHERE par.padre = 4 AND par.par_estado = 1 ORDER BY descripcion ASC';
+									$result = mysqli_query($con, $query);
+									while ($rows = mysqli_fetch_assoc($result)) 
+									{
+										$checked     = "";
+										$readOnly    = "readOnly";
+										$montoPagado = "";
+											
+										if (!$resultSelectPagos = mysqli_query($con, $selectPagos)) {
+											exit(mysqli_error($con));
+										}
+										
+										if (mysqli_num_rows($resultSelectPagos) > 0) 
+										{
+											while ($rowSelectPagos = mysqli_fetch_assoc($resultSelectPagos)) 
+											{
+												if ($rowSelectPagos['codigo_medio_pago'] == $rows['codigo'])
+												{
+													$checked     = "checked";
+													$readOnly    = ($rowSelectComprobante['emitido'] == "1") ? "readOnly" : "";
+													$montoPagado = number_format($rowSelectPagos['monto'], 2, '.', '');
+												}
+											}
+										}
+								?>
+								<div class="col-lg-7 col-mb-6 col-sm-6">
+									<div class="checkbox">
+										<label><input type="checkbox" value="<?php echo $rows['codigo']; ?>" id="CB<?php echo $rows['codigo']; ?>" name="CB<?php echo $rows['codigo']; ?>" 
+										    onchange="if(this.checked==true){document.getElementById('MP<?php echo $rows['codigo']; ?>').readOnly=false; 
+										    document.getElementById('MP<?php echo $rows['codigo']; ?>').value='';}else{document.getElementById('MP<?php echo $rows['codigo']; ?>').readOnly=true;
+										    document.getElementById('MP<?php echo $rows['codigo']; ?>').value='';}" <?php echo $checked; ?> 
+										    <?php echo $disabled; ?> /><?php echo $rows['descripcion']; ?></label>
+									</div>
+								</div>
+								<div class="col-lg-5 col-mb-6 col-sm-6">
+									<input class="form-control" type="text" id="MP<?php echo $rows['codigo']; ?>" name="MP<?php echo $rows['codigo']; ?>" style="text-align:right;" 
+									    value="<?php echo $montoPagado; ?>" <?php echo $readOnly; ?> />
+								</div>
+								<?php
+									}
+								?>
+							</div>
+    						<div class="col-lg-4 col-mb-4 col-sm-12" id="div-cuotas" style="<?php echo ($tipoPago == 'CREDITO') ? '' : 'display:none;'; ?>">
+    							<div class="col-lg-12 col-mb-12 col-sm-12">
+    								<label>Cuotas</label>
+    							</div>
+    						    <div id="act-detalle-cuotas">
+    						        <table class="table table-striped table-bordered">
+                    				<thead>
+                    					<tr>
+                    						<th width="8%">N°</th>
+                    						<th width="36%">Fecha</th>
+                    						<th width="28%">Monto</th>
+                    						<th width="28%">Acciones</th>
+                    					</tr>
+                    				</thead>
+                    				<tbody>
+                                        <?php
+                                    		$number           = 1;
+                                    		$montoTotalCuotas = 0;
+                                    		
+            								if(mysqli_num_rows($resultSelectCuotas) > 0) 
+            								{
+            									while ($row = mysqli_fetch_assoc($resultSelectCuotas)) 
+            									{
+                                        ?>
+                    					<tr>
+                    						<td class="text-center"><?php echo $number; ?></td>
+                    						<td><?php echo $row['fecha']; ?></td>
+                    						<td style="text-align:right;"><?php echo number_format($row['monto'], 2, '.', ''); ?></td>
+                    						<td class="text-center">
+                    							<!-- Botones deshabilitados temporalmente -->
+                    							<button type="button" class="btn btn-default btn-circle disabled" title="Editar" <?php echo $disabled; ?>>
+                    								<i class="fa fa-pencil"></i>
+                    							</button>
+                    							<button type="button" class="btn btn-danger btn-circle disabled" title="Eliminar" <?php echo $disabled; ?>>
+                    								<i class="fa fa-times"></i>
+                    							</button>
+                    						</td>
+                    					</tr>
+                                        <?php 
+                                			        $montoTotalCuotas += $row['monto'];
+                                			        $number++;
+                                		        }
+                                		?>
+                    				</tbody>
+                    				<tfoot>
+                    					<tr>
+                    						<td>&nbsp;</td>
+                    						<td style="text-align:right;font-weight:bold;">Monto total</td>
+                    						<td style="text-align:right;font-weight:bold;"><?php echo number_format($montoTotalCuotas, 2, '.', ''); ?></td>
+                    						<td>&nbsp;</td>
+                    					</tr>
+                    					<input type="hidden" id="monto-total-cuotas" name="monto-total-cuotas" value="<?php echo $montoTotalCuotas; ?>">
+                    				</tfoot>
+                                        <?php 
+                                        	}
+                                        	else
+                                        	{
+                                        ?>
+                    					<tr><td colspan="4">Aún no se han agregado cuotas.</td></tr>
+                    					</tbody>
+                    					<tfoot>
+                        					<tr>
+                        						<td>&nbsp;</td>
+                        						<td style="text-align:right;font-weight:bold;">Monto total</td>
+                        						<td style="text-align:right;font-weight:bold;">0.00</td>
+                        						<td>&nbsp;</td>
+                        					</tr>
+                        					<input type="hidden" id="monto-total-cuotas" name="monto-total-cuotas" value="0">
+                        				</tfoot>
+                                        <?php 
+                                        	}
+                                        ?> 
+                    			</table>
+    						    </div>
+    						</div>
+						</div>
+						<!-- /.col-lg-12 -->
+						<div class="panel-body">
+							<div id="detalle-comprobante">
+								<table class="table table-striped table-bordered">
+									<thead>
+										<tr>
+											<th width="5%">N°</th>
+											<th width="50%">Producto</th>
+											<th width="15%">Cantidad</th>
+											<th width="15%">Precio unit.</th>
+											<th width="15%">Precio total</th>
+										</tr>
+									</thead>
+									<tbody>
+									<?php 
+										$number        = 1;
+										$montototal    = 0;
+										$montoneto     = 0;
+										$montoigv      = 0;
+										$montoEnLetras = '-';
+										
+										if (mysqli_num_rows($resultSelectDetComprobante) > 0) 
+										{
+											while ($rowSelectDetComprobante = mysqli_fetch_assoc($resultSelectDetComprobante)) 
+											{
+									?>
+										<tr>
+											<td><?php echo $number; ?></td>
+									<?php 
+												if ($rowSelectDetComprobante['unidad_medida'] == 3) 
+												{
+									?>
+											<td><?php echo $rowSelectDetComprobante['des_producto'].' - '.$rowSelectDetComprobante['cantidad'].' - '.
+											    $rowSelectDetComprobante['espesor'].'X'.$rowSelectDetComprobante['ancho'].'X'.$rowSelectDetComprobante['largo']; ?></td>
+									<?php 
+												} 
+												else 
+												{
+									?>
+											<td><?php echo $rowSelectDetComprobante['des_producto']; ?></td>
+									<?php 
+												}
+									?>
+											<td style="text-align:center;"><?php echo $rowSelectDetComprobante['cantidad_final']; ?></td>
+											<td style="text-align:right;"><?php echo number_format($rowSelectDetComprobante['precio_unitario'], 2, '.', ''); ?></td>
+											<td style="text-align:right;"><?php echo number_format($rowSelectDetComprobante['precio_total'], 2, '.', ''); ?></td>
+										</tr>
+									<?php 
+												$_SESSION['rows'][$number] = $rowSelectDetComprobante;
+												$montototal += $rowSelectDetComprobante['precio_total'];
+												$number++;
+											}
+											$_SESSION['num-registros'] = $number;
+											$montototal = round($montototal, 2);
+											$montoneto  = round($montototal/1.18, 2);
+											$montoigv   = $montototal - $montoneto;
+											
+											$metodoReflex  = new ReflectionMethod('numerosALetras', 'to_word');
+											$montoEnLetras = $metodoReflex->invoke(new numerosALetras(), number_format($montototal, 2, '.', ''), 'PEN');
+										}
+									?>
+									</tbody>
+									<tfoot>
+										<tr>
+											<td colspan="3">Son: <?php echo $montoEnLetras; ?></td>
+											<td>Monto neto</td>
+											<td style="text-align:right;"><?php echo number_format($montoneto, 2, '.', ''); ?></td>
+										</tr>
+										<tr>
+											<td colspan="3">&nbsp;</td>
+											<td>IGV</td>
+											<td style="text-align:right;"><?php echo number_format($montoigv, 2, '.', ''); ?></td>
+										</tr>
+										<tr>
+											<td colspan="3">&nbsp;</td>
+											<td>Monto total (S/)</td>
+											<td style="text-align:right;"> <?php echo number_format($montototal, 2, '.', ''); ?></td>
+											<input type="hidden" id="monto-total" name="monto-total" value="<?php echo $montototal; ?>" />
+										</tr>
+									<tfoot>
+								</table>
+							</div>
+						</div>
+						
+    					<!--**** Detracciones - inicio - 2024.07.21 ****-->
+    					
+    					<div class="panel-body" id="div-detracciones" style="<?php echo $rowSelectComprobante['tip_comprobante'] == '1' ? '' : 'display:none;' ?>">
+    						<h4>Detracciones</h4>
+    						<div class="col-lg-4 col-mb-4 col-sm-12">
+    						    <div class="col-lg-12 col-mb-12 col-sm-12">
+    								<label for="aplica-detraccion">¿Aplica detracción?</label>
+    								<input class="form-control" type="text" id="desc-aplica-detraccion" name="desc-aplica-detraccion" 
+    								    value="<?php echo $rowSelectComprobante['desc_aplica_detraccion']; ?>" readonly disabled />
+					                <input type="hidden" id="aplica-detraccion" name="aplica-detraccion" value="<?php echo $rowSelectComprobante['aplica_detraccion']; ?>" />
+    							</div>
+    						</div>
+    						<div class="col-lg-8 col-mb-8 col-sm-12" id="div-detalle-detracciones" style="<?php echo $rowSelectComprobante['desc_aplica_detraccion'] == 'No' ? 'display:none;' : '' ?>">
+    							<div class="col-lg-12 col-mb-12 col-sm-12">
+    								<label for="leyenda-detraccion">Leyenda</label>
+    								<input class="form-control" type="text" id="leyenda-detraccion" name="leyenda-detraccion" 
+    								    value="Operación sujeta al Sistema de Pago de Obligaciones Tributarias con el Gobierno Central" readonly disabled />
+    							</div>
+    							<div class="col-lg-6 col-mb-6 col-sm-12">
+    								<label for="bien-servicio-detraccion">Tipo de bien o servicio</label>
+    								<input class="form-control" type="text" id="desc-bien-servicio-detraccion" name="desc-bien-servicio-detraccion" 
+    								    value="<?php echo $rowSelectComprobante['desc_tip_detraccion']; ?>" readonly disabled />
+					                <input type="hidden" id="bien-servicio-detraccion" name="bien-servicio-detraccion" value="<?php echo $rowSelectComprobante['tip_detraccion']; ?>" />
+    							</div>
+    							<div class="col-lg-12 col-mb-12 col-sm-12">
+    								<label for="medio-pago-detraccion">Medio de pago</label>
+    								<input class="form-control" type="text" id="desc-medio-pago-detraccion" name="desc-medio-pago-detraccion" 
+    								    value="<?php echo $rowSelectComprobante['desc_medio_pago_detraccion']; ?>" readonly disabled />
+					                <input type="hidden" id="medio-pago-detraccion" name="medio-pago-detraccion" value="<?php echo $rowSelectComprobante['cod_medio_pago_detraccion']; ?>" />
+    							</div>
+    							<div class="col-lg-4 col-mb-6 col-sm-12">
+    								<label for="numero-cuenta-detraccion">Número cuenta BN</label>
+    								<input class="form-control" type="text" id="numero-cuenta-detraccion" name="numero-cuenta-detraccion" 
+    								    value="00-062-092416" readonly disabled />
+    							</div>
+    							<div class="col-lg-4 col-mb-6 col-sm-12">
+    								<label for="porcentaje-detraccion">Porcentaje de detracción</label>
+    								<input class="form-control" type="text" id="desc-porcentaje-detraccion" name="desc-porcentaje-detraccion" style="text-align:right;" 
+    								    value="<?php echo $rowSelectComprobante['por_detraccion'] . "%"; ?>" readonly disabled />
+    								<input type="hidden" id="porcentaje-detraccion" name="porcentaje-detraccion" value="<?php echo $rowSelectComprobante['por_detraccion']; ?>" />
+    							</div>
+    							<div class="col-lg-4 col-mb-6 col-sm-12">
+    								<label for="monto-detraccion">Monto de detracción</label>
+    								<input class="form-control" type="text" id="monto-detraccion" name="monto-detraccion" style="text-align:right;" 
+    								    value="<?php echo $rowSelectComprobante['mon_detraccion']; ?>" readonly disabled />
+    							</div>
+    						</div>
+    					</div>
+    					
+    					<!--**** Detracciones - fin - 2024.07.26 ****-->
+    					
+						<div class="panel-body centrar">
+							<input type="submit" id="submit-comprobante" class="btn btn-info" title="emitir" name="emitir" value="Emitir" <?php echo $disabled; ?> />
+							<button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+							<input type="hidden" id="id-comprobante" name="id-comprobante" value="<?php echo $rowSelectComprobante['id']; ?>" />
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+<?php
+			}
+		}
+	}
+?>

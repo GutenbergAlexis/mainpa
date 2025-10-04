@@ -1,0 +1,177 @@
+<?php
+	include('../../util/database.php');
+	include('../../util/numerosALetras.php');
+    require('../../util/fpdf/fpdf.php');
+	session_start();
+	
+	$idCotizacion = $_POST['id-ver-cotizacion'];
+	
+	$setLocale = 
+		"SET lc_time_names = 'es_PE'"; 
+		
+	$selectCotizacion = "
+		SELECT cot.id, cot.id_cliente, cli.tip_documento, cli.num_documento, 
+			par2.descripcion AS des_tipo_documento, cli.direccion, cli.contacto, 
+			CONCAT_WS(' ', cli.nombre_razon_social, cli.seg_nombre, cli.pri_apellido, cli.seg_apellido) AS nombre_razon_social, 
+			cot.tip_comprobante, par1.descripcion AS des_comprobante, par3.descripcion AS des_med_pago, 
+			cot.guia_remision, DATE_FORMAT(cot.fec_emision, 'Lima, %W %d de %M del %Y') AS fecha, cot.ord_compra, 
+			cot.observaciones, cot.par_medio_pago, cot.usu_creacion AS vendedor, cot.condicion_pago, cot.desc_medio_pago, 
+			usu.pri_nombre, usu.pri_apellido, cot.aplica_detraccion, par4.descripcion AS desc_aplica_detraccion, 
+			cot.tip_detraccion, par5.descripcion AS desc_tip_detraccion, cot.por_detraccion, cot.mon_detraccion, 
+			cot.cod_medio_pago_detraccion, par6.descripcion AS desc_medio_pago_detraccion 
+		FROM cotizaciones cot 
+		JOIN clientes cli ON cli.id = cot.id_cliente 
+		JOIN usuarios usu ON usu.user = cot.usu_creacion 
+		JOIN parametros par1 ON par1.codigo = cot.tip_comprobante AND par1.padre = 8 
+		JOIN parametros par2 ON par2.codigo = cli.tip_documento AND par2.padre = 12 
+		LEFT JOIN parametros par3 ON par3.codigo = cot.par_medio_pago AND par3.padre = 4 
+		LEFT JOIN parametros par4 ON par4.abreviatura = cot.aplica_detraccion AND par4.padre = 42 /*aplica detracción*/
+		LEFT JOIN parametros par5 ON par5.codigo = cot.tip_detraccion AND par5.padre = 68 /*tipo de detracción*/
+		LEFT JOIN parametros par6 ON par6.codigo = cot.cod_medio_pago_detraccion AND par6.padre = 45 /*medio pago detracción*/
+		WHERE cot.id = '$idCotizacion'";
+
+	$selectDetCotizacion = "
+		SELECT dcot.id_producto, pro.codigo AS cod_producto, pro.descripcion AS des_producto, dcot.cantidad, 
+			dcot.precio AS precio_unitario, dcot.precio*dcot.cantidad_final precio_total, pro.unidad_medida, 
+			dcot.espesor, dcot.ancho, dcot.largo, dcot.cantidad_final, par.abreviatura AS abr_unidad_medida 
+		FROM det_cotizacion dcot 
+		JOIN productos pro ON pro.id = dcot.id_producto 
+		JOIN parametros par ON par.codigo = pro.unidad_medida 
+		WHERE par.padre = 29 AND dcot.id_cotizacion = '$idCotizacion'";
+	
+	if (!$resultSetLocale = mysqli_query($con, $setLocale)) 
+	{
+		exit(mysqli_error($con));
+	}
+	
+	if (!$resultSelectCotizacion = mysqli_query($con, $selectCotizacion)) 
+	{
+		exit(mysqli_error($con));
+	}
+	
+	if (!$resultSelectDetCotizacion = mysqli_query($con, $selectDetCotizacion)) 
+	{
+		exit(mysqli_error($con));
+	}
+	
+	if(mysqli_num_rows($resultSelectCotizacion) > 0) 
+	{
+		while ($rowSelectCotizacion = mysqli_fetch_assoc($resultSelectCotizacion)) 
+		{
+			$pdf=new FPDF('P', 'mm', array(220, 330));
+			$pdf->AddPage();
+			$pdf->SetMargins(30, 10, 10);
+			$pdf->SetFont('Arial', '', 10);
+			$pdf->Cell(180, 24, ' ', 0, 1, '');
+			$pdf->Cell(180, 8, $rowSelectCotizacion['fecha'], 0, 1, 'R');
+			$pdf->SetFont('Arial', 'BU', 11);
+			$pdf->Cell(180, 8, utf8_decode('COTIZACIÓN C001-'.str_pad($rowSelectCotizacion['id'], 8, "0", STR_PAD_LEFT)), 0, 1, 'C');
+			$pdf->SetFont('Arial', 'B', 11);
+			$pdf->Cell(180, 4, ' ', 0, 1, '');
+			$pdf->MultiCell(180, 8, utf8_decode('SEÑOR(ES): '.$rowSelectCotizacion['nombre_razon_social']), 0, 1, '');
+			
+			if ($rowSelectCotizacion['tip_comprobante'] == 1) 
+			{
+				$pdf->MultiCell(180, 8, utf8_decode('ATENCIÓN: '.$rowSelectCotizacion['contacto']), 0, 1, '');
+			}
+			
+			$pdf->Cell(180, 4, ' ', 0, 1, '');
+			$pdf->SetFont('Arial', '', 10);
+			$pdf->Cell(180, 8, utf8_decode('Por medio de la presente le hacemos llegar la siguiente cotización según su solicitud:'), 0, 1, '');
+			$pdf->Cell(180, 4, ' ', 0, 1, '');
+			//Cabecera
+			$pdf->SetFillColor(64, 64, 64);
+			$pdf->SetTextColor(255);
+			$pdf->SetDrawColor(64, 64, 64);
+			$pdf->SetLineWidth(.3);
+			$pdf->SetFont('Arial', 'B', 10);
+			//Datos cabecera
+			$pdf->Cell(12, 7, 'Cant.', 1, 0, 'C', 1);
+			$pdf->Cell(18, 7, 'U.M.', 1, 0, 'C', 1);
+			$pdf->Cell(100, 7, utf8_decode('Descripción'), 1, 0, 'C', 1);
+			$pdf->Cell(25, 7, 'P.U.', 1, 0, 'C', 1);
+			$pdf->Cell(25, 7, 'Importe', 1, 0, 'C', 1);
+			$pdf->Ln();
+			//Detalle
+			$pdf->SetFillColor(255, 255, 255);
+			$pdf->SetTextColor(0);
+			$pdf->SetFont('Arial', '', 9);
+			//Datos detalle 
+			$montoTotal    = 0;
+			$montoEnLetras = '-';
+			
+			if(mysqli_num_rows($resultSelectDetCotizacion) > 0) 
+			{
+				while ($rowSelectDetCotizacion = mysqli_fetch_assoc($resultSelectDetCotizacion)) 
+				{
+					$pdf->Cell(12, 7, $rowSelectDetCotizacion['cantidad_final'], 1, 0, 'C', 1);
+					$pdf->Cell(18, 7, $rowSelectDetCotizacion['abr_unidad_medida'], 1, 0, 'C', 1);
+					
+					if ($rowSelectDetCotizacion['unidad_medida'] == 3) 
+					{
+						$pdf->Cell(100, 7, utf8_decode($rowSelectDetCotizacion['des_producto'].'-'.$rowSelectDetCotizacion['cantidad'].'-'.$rowSelectDetCotizacion['espesor'].'X'.$rowSelectDetCotizacion['ancho'].'X'.$rowSelectDetCotizacion['largo']), 1, 0, 'L', 1);
+					} 
+					else 
+					{
+						$pdf->Cell(100, 7, $rowSelectDetCotizacion['des_producto'], 1, 0, 'L', 1);
+					}
+					
+					$pdf->Cell(25, 7, number_format($rowSelectDetCotizacion['precio_unitario'], 2, '.', ''), 1, 0, 'R', 1);
+					$pdf->Cell(25, 7, number_format($rowSelectDetCotizacion['precio_total'], 2, '.', ''), 1, 0, 'R', 1);
+					$pdf->Ln();
+					
+					$montoTotal += $rowSelectDetCotizacion['precio_total'];
+				}
+				
+				$montoNeto = round($montoTotal/1.18, 2);
+				$montoIGV  = $montoTotal - $montoNeto;
+			
+				$metodoReflex  = new ReflectionMethod('numerosALetras', 'to_word');
+				$montoEnLetras = $metodoReflex->invoke(new numerosALetras(), $montoTotal, 'PEN');
+				
+				if ($rowSelectCotizacion['tip_comprobante'] != 5) 
+				{
+					$pdf->Cell(130, 7, ' ', 1, 0, 'L', 1);
+					$pdf->Cell(25, 7, 'SUB TOTAL', 1, 0, 'R', 1);
+					$pdf->Cell(25, 7, 'S/ '.number_format($montoNeto, 2, '.', ''), 1, 0, 'R', 1);
+					$pdf->Ln();
+					$pdf->Cell(130, 7, ' ', 1, 0, 'L', 1);
+					$pdf->Cell(25, 7, 'IGV', 1, 0, 'R', 1);
+					$pdf->Cell(25, 7, 'S/ '.number_format($montoIGV, 2, '.', ''), 1, 0, 'R', 1);
+					$pdf->Ln();
+				}
+				
+				$pdf->Cell(130, 7, 'SON: '.$montoEnLetras, 1, 0, 'L', 1);
+				$pdf->Cell(25, 7, 'TOTAL', 1, 0, 'R', 1);
+				$pdf->Cell(25, 7, 'S/ '.number_format($montoTotal, 2, '.', ''), 1, 0, 'R', 1);
+				$pdf->Ln();
+			}
+			
+			$pdf->SetFont('Arial', '', 10);
+			/*$pdf->Cell(180, 12, ' ', 0, 1, '');*/
+			$pdf->MultiCell(180, 8, utf8_decode('Observaciones: '.$rowSelectCotizacion['observaciones']), 0, 1, '');
+			/*$pdf->SetFont('Arial', '', 10);
+			$pdf->Cell(180, 12, ' ', 0, 1, '');*/
+			$pdf->SetFont('Arial', 'BU', 10);
+			$pdf->Cell(180, 8, utf8_decode('Condiciones generales de la venta'), 0, 1, '');
+			$pdf->SetFont('Arial', '', 10);
+			
+			$condicionPago = empty($rowSelectCotizacion['condicion_pago'])  ? "-"       : $rowSelectCotizacion['condicion_pago']." días";
+			$descMedioPago = empty($rowSelectCotizacion['desc_medio_pago']) ? "CONTADO" : $rowSelectCotizacion['desc_medio_pago'];
+			
+			$pdf->Cell(180, 8, utf8_decode('Condición de Pago: '.$condicionPago), 0, 1, 'L');
+			$pdf->Cell(180, 8, 'Forma de Pago: '.$descMedioPago, 0, 1, 'L');
+			$pdf->Cell(180, 8, utf8_decode('Validez de la Oferta: 15 DÍAS - Sujeto a stock'), 0, 1, 'L');
+			$pdf->Cell(180, 8, 'Entrega: MAINPA', 0, 1, 'L');
+			$pdf->Cell(180, 12, ' ', 0, 1, '');
+			$pdf->Cell(180, 8, 'Atentamente', 0, 1, 'L');
+			$pdf->SetFont('Arial', 'B', 10);
+			$pdf->Cell(180, 8, utf8_decode($rowSelectCotizacion['pri_nombre']).' '.utf8_decode($rowSelectCotizacion['pri_apellido']), 0, 1, 'L');
+			$pdf->Cell(180, 8, utf8_decode('P&D INVERSIONES E IMPORTACIONES SAC'), 0, 1, 'L');
+			$pdf->Cell(180, 4, ' ', 0, 1, '');
+			$pdf->SetFont('Arial', 'I', 12);
+			$pdf->Cell(180, 8, utf8_decode('¡Gracias por su preferencia!'), 0, 1, 'C');
+			$pdf->Output();
+		}
+	}
+?>

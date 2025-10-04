@@ -1,0 +1,52 @@
+.open-modal {
+  cursor: pointer;
+}
+
+.close-modal {
+  background-color: #fff;
+  color: #000;
+  margin: 20px 0 10px 0;
+  border: 1px solid #000;
+  padding: 10px 20px;
+}
+
+.close-modal:hover{
+  background-color: #6abe52;
+  color: #fff;
+  border: 1px solid #000;
+}
+
+.mod-producto {
+  width: 760px;
+  padding: 30px 50px;
+  border: 1px solid #000;
+  position: absolute; 
+  top: 50%;
+  transform: translatey(-50%);
+}
+@media only screen and (max-width:600px){
+.mod-producto {
+  padding: 30px 50px;
+  border: 1px solid #000;
+  position: absolute; 
+  top: 50%;
+  transform: translatey(-50%);
+}}
+
+.mod-producto::backdrop {
+  background: rgba(111, 111, 111, 0.5);
+}
+.img-producto{
+  width:100%!important;
+  margin:auto;
+}
+
+.mod-titulo{
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.mod-descripcion{
+  font-size: 14px;
+  font-weight: 300;
+}

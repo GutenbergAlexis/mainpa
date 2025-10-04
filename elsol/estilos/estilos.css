@@ -1,0 +1,12 @@
+.centrar{
+  text-align:center;
+}
+.derecha{
+  text-align:right;
+}
+.negrita{
+  font-weight:bold;
+}
+.mayuscula{
+  text-transform:uppercase;
+}

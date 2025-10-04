@@ -1,0 +1,783 @@
+<?php
+	include('../../util/database.php');
+	include('../../util/numerosALetras.php');
+	include('../../x/detComprobante.php');
+	session_start();
+	
+	$idComprobante = $_POST['idComprobante'];
+
+	$selectComprobante = "
+		SELECT com.id, com.id_cliente, cli.tip_documento, cli.num_documento, par2.descripcion AS des_tipo_documento, 
+			CONCAT_WS(' ', cli.nombre_razon_social, cli.seg_nombre, cli.pri_apellido, cli.seg_apellido) AS nombre_razon_social, 
+			cli.direccion, com.tip_comprobante, par1.descripcion AS des_comprobante, par3.descripcion AS des_med_pago, 
+			com.guia_remision, DATE_FORMAT(com.fec_emision, '%d/%m/%Y') AS fec_emision, com.ord_compra, com.observaciones, 
+			com.pagado, com.emitido, com.par_medio_pago, com.condicion_pago, com.desc_medio_pago, com.entregado, 
+			com.aplica_detraccion, par4.descripcion AS desc_aplica_detraccion, 
+			com.tip_detraccion, par5.descripcion AS desc_tip_detraccion, com.por_detraccion, com.mon_detraccion, 
+			com.cod_medio_pago_detraccion, par6.descripcion AS desc_medio_pago_detraccion 
+		FROM comprobantes com
+		JOIN clientes cli ON cli.id = com.id_cliente
+		JOIN parametros par1 ON par1.codigo = com.tip_comprobante AND par1.padre = 8
+		JOIN parametros par2 ON par2.codigo = cli.tip_documento AND par2.padre = 12
+		LEFT JOIN parametros par3 ON par3.codigo = com.par_medio_pago AND par3.padre = 4 
+		LEFT JOIN parametros par4 ON par4.abreviatura = com.aplica_detraccion AND par4.padre = 42 /*aplica detracción*/
+		LEFT JOIN parametros par5 ON par5.codigo = com.tip_detraccion AND par5.padre = 68 /*tipo de detracción*/
+		LEFT JOIN parametros par6 ON par6.codigo = com.cod_medio_pago_detraccion AND par6.padre = 45 /*medio pago detracción*/
+		WHERE com.id = '$idComprobante'";
+	
+	$selectCuotas = "
+		SELECT cuo.id, cuo.id_comprobante, DATE_FORMAT(cuo.fecha, '%Y-%m-%d') AS fecha, cuo.monto 
+		FROM cuotas cuo 
+		WHERE cuo.id_comprobante = '$idComprobante'";
+
+	$selectDetComprobante = "
+		SELECT dcom.id, dcom.id_producto, pro.descripcion AS des_producto, dcom.cantidad, 
+			dcom.precio AS precio_unitario, dcom.precio*dcom.cantidad_final precio_total, pro.unidad_medida, 
+			dcom.espesor, dcom.ancho, dcom.largo, dcom.cantidad_final 
+		FROM det_comprobante dcom
+		JOIN productos pro ON pro.id = dcom.id_producto
+		WHERE dcom.id_comprobante = '$idComprobante'";
+				
+	$selectPagos = "
+		SELECT pag.codigo_medio_pago, pag.monto 
+		FROM pagos pag 
+		WHERE pag.id_comprobante = '$idComprobante'";
+	
+	if (!$resultSelectComprobante = mysqli_query($con, $selectComprobante)) 
+	{
+		exit(mysqli_error($con));
+	}
+	
+	if (!$resultSelectCuotas = mysqli_query($con, $selectCuotas)) 
+	{
+		exit(mysqli_error($con));
+	}
+	
+	if (!$resultSelectDetComprobante = mysqli_query($con, $selectDetComprobante)) 
+	{
+		exit(mysqli_error($con));
+	}
+	
+	if (!$resultSelectPagos = mysqli_query($con, $selectPagos)) 
+	{
+		exit(mysqli_error($con));
+	}
+
+	if (isset($_SESSION['user'])) {
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>Actualizar comprobante - Mainpasoft</title>
+	<link rel="shortcut icon" href="../../img/favicon.ico">
+    <!-- Bootstrap Core CSS -->
+    <link href="../../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../vendor/bootstrap/css/bootstrap-datepicker3.standalone.min.css" rel="stylesheet">
+	<!-- Latest compiled and minified CSS -->
+	<link href="../../vendor/bootstrap/css/bootstrap-select.min.css" rel="stylesheet">
+    <!-- MetisMenu CSS -->
+    <link href="../../vendor/metisMenu/metisMenu.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="../../dist/css/sb-admin-2.css" rel="stylesheet">
+    <!-- Custom Fonts -->
+    <link href="../../vendor/font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href="../../estilos/estilos.css" rel="stylesheet" type="text/css">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+</head>
+<body>
+	<div id="wrapper">
+		<!-- Navigation -->
+		<nav class="navbar navbar-default navbar-static-top" role="navigation" style="margin-bottom: 0">
+			<div class="navbar-header">
+				<button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+					<span class="sr-only">Toggle navigation</span>
+					<span class="icon-bar"></span>
+					<span class="icon-bar"></span>
+					<span class="icon-bar"></span>
+				</button>
+                <a class="navbar-brand" href="#"><img src="../../img/logo.jpg" width="230"></a>
+			</div>
+			<!-- /.navbar-header -->
+			<ul class="nav navbar-top-links navbar-right">
+				<li id="usuario">Bienvenido <?php echo strtolower($_SESSION['user']); ?> - <?php echo strtolower($_SESSION['desPerfil']); ?></li>
+				<li class="divider"></li>
+				<li><a href="../logout.php"><i class="fa fa-sign-out fa-fw"></i> Salir</a>
+				</li>
+				<!-- /.dropdown -->
+			</ul>
+			<!-- /.navbar-top-links -->
+			<div class="navbar-default sidebar" role="navigation">
+				<div class="sidebar-nav navbar-collapse">
+					<ul class="nav" id="side-menu">
+						<li class="active">
+							<a href="#"><i class="fa fa-sitemap fa-fw"></i> Ingresos<span class="fa arrow"></span></a>
+							<ul class="nav nav-second-level">
+								<li>
+									<a href="proceso-ventas.php">Proceso de ventas</a>
+								</li>
+                                <li>
+                                    <a href="buscar-cotizaciones.php">Buscar cotizaciones</a>
+                                </li>
+								<li>
+									<a class="active" href="buscar-ventas.php">Buscar ventas</a>
+								</li>
+								<li>
+									<a href="otros-ingresos.php">Otros</a>
+								</li>
+							</ul>
+						</li>
+						<li>
+							<a href="#"><i class="fa fa-sitemap fa-fw"></i> Egresos<span class="fa arrow"></span></a>
+							<ul class="nav nav-second-level">
+                                <li>
+                                    <a href="../egresos/compras.php">Compras</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/servicios.php">Servicios</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/suministros.php">Suministros</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/bancos.php">Bancos</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/personal.php">Personal</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/otros-egresos.php">Otros</a>
+                                </li>
+							</ul>
+						</li>
+						<li>
+							<a href="#"><i class="fa fa-table fa-fw"></i> Reportes<span class="fa arrow"></span></a>
+							<ul class="nav nav-second-level">
+                                <li>
+                                    <a href="../reportes/detalle-diario.php">Detalle diario</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-ventas-producto.php">Reporte de ventas por producto</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-ventas-general.php">Reporte de ventas general</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-compras-producto.php">Reporte de compras por producto</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-compras-general.php">Reporte de compras general</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-ingresos-mensual.php">Reporte de ingresos mensual</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-egresos-mensual.php">Reporte de egresos mensual</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-resumen-mensual.php">Reporte resumen mensual</a>
+                                </li>
+							</ul>
+						</li>
+						<li>
+							<a href="#"><i class="fa fa-cog fa-fw"></i> Mantenimiento<span class="fa arrow"></span></a>
+							<ul class="nav nav-second-level">
+								<li>
+									<a href="usuarios.php">Usuarios</a>
+								</li>
+								<li>
+									<a href="clientes.php">Clientes</a>
+								</li>
+								<li>
+									<a href="productos.php">Productos</a>
+								</li>
+								<li>
+									<a href="proveedores.php">Proveedores</a>
+								</li>
+							</ul>
+						</li>
+					</ul>
+				</div>
+				<!-- /.sidebar-collapse -->
+			</div>
+			<!-- /.navbar-static-side -->
+		</nav>
+		<!-- Page Content -->
+		<div id="page-wrapper">
+			<div class="container-fluid">
+				<div class="row">
+					<div class="col-lg-12">
+						<h1 class="page-header">Proceso de ventas</h1>
+					</div>
+<?php
+		if ($_SESSION['perfil'] == 1 || $_SESSION['perfil'] == 3) 
+		{
+			if(isset($_POST['idComprobante'])) 
+			{
+				$idComprobante = $_POST['idComprobante'];
+				$readonly      = "";
+				$disabled      = "";
+				$cargar        = "";
+				$eliminar      = "";
+				
+				if(mysqli_num_rows($resultSelectComprobante) > 0) 
+				{
+					while ($rowSelectComprobante = mysqli_fetch_assoc($resultSelectComprobante)) 
+					{
+						$readonly          = $rowSelectComprobante['emitido'] == 1 ? "readonly" : "";
+						$disabled          = $rowSelectComprobante['emitido'] == 1 ? "disabled" : "";
+						$notDisabled       = $rowSelectComprobante['emitido'] == 0 ? "disabled" : "";
+						$checkedEntregado  = $rowSelectComprobante['entregado'] == 1 ? "checked"  : "";
+						$disabledMedioPago = $_SESSION['perfil'] == 1 ? "disabled" : "";
+?>
+					<div class="panel-body">
+						<h4>Tipo de comprobante</h4>
+						<div class="col-lg-4 col-mb-6 col-sm-12">
+							<select class="form-control selectpicker" id="tipo-comprobante" data-live-search="true" <?php echo $disabled; ?> >
+								<?php 
+									$selectTipoComprobante = 'SELECT par.* FROM parametros par WHERE par.padre = 8 AND par.par_estado = 1 ORDER BY par.codigo ASC';
+									$resultSelectTipoComprobante = mysqli_query($con, $selectTipoComprobante);
+									while ($rowSelectTipoComprobante = mysqli_fetch_assoc($resultSelectTipoComprobante)) 
+									{
+								?>
+								<option value='<?php echo $rowSelectTipoComprobante['codigo']; ?>' <?php echo ($rowSelectTipoComprobante['codigo'] == $rowSelectComprobante['tip_comprobante']) ? "selected" : "" ?> data-tokens='<?php echo $rowSelectTipoComprobante['codigo'].$rowSelectTipoComprobante['descripcion']; ?>'>
+									<?php echo $rowSelectTipoComprobante['codigo'].' - '.$rowSelectTipoComprobante['descripcion']; ?>
+								</option>
+								<?php 
+									}
+								?>
+							</select>
+						</div>
+					</div>
+					<div class="panel-body">
+						<h4>DNI/RUC del cliente</h4>
+						<div class="col-lg-3 col-mb-6 col-sm-12">
+							<input class="form-control" type="text" id="numero-documento" value="<?php echo $rowSelectComprobante['num_documento']; ?>" <?php echo $readonly; ?> name="numero-documento" placeholder="Número de documento" />
+						</div>
+						<div class="col-lg-2 col-mb-6 col-sm-12">
+							<button type="button" class="btn btn-success btn-circle" data-toggle="modal" onclick="buscarCliente()" <?php echo $disabled; ?> title="buscar cliente"><i class="fa fa-search"></i></button>
+							<button type="button" class="btn btn-success btn-circle" data-toggle="modal" data-target="#mod-agregar-cliente" <?php echo $disabled; ?> title="agregar cliente"><i class="fa fa-plus"></i></button>
+						</div>
+					</div>
+					<input type="hidden" id="id-comprobante" name="id-comprobante" value="<?php echo $_POST['idComprobante']; ?>" />
+					<input type="hidden" id="id-cliente" name="id-cliente" value="<?php echo $rowSelectComprobante['id_cliente']; ?>" />
+					<input type="hidden" id="emitido" name="emitido" value="<?php echo $rowSelectComprobante['emitido']; ?>" />
+					<div class="panel-body">
+						<h4>Datos del cliente</h4>
+						<div class="col-lg-8 col-mb-8 col-sm-12">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="nombre">Nombre/Razón social</label>
+								<input class="form-control mayuscula" type="text" id="nombre" name="nombre" placeholder="Nombre/Razón social" onkeyup="javascript:this.value=this.value.toUpperCase();" value="<?php echo $rowSelectComprobante['nombre_razon_social']; ?>" readonly />
+							</div>
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="direccion">Dirección</label>
+								<input class="form-control mayuscula" type="text" id="direccion" name="direccion" placeholder="Dirección" onkeyup="javascript:this.value=this.value.toUpperCase();" value="<?php echo $rowSelectComprobante['direccion']; ?>" readonly />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="guia-remision">Guía de remisión</label>
+								<input class="form-control mayuscula" type="text" id="guia-remision" name="guia-remision" placeholder="Guía de remisión" onkeyup="javascript:this.value=this.value.toUpperCase();" value="<?php echo $rowSelectComprobante['guia_remision']; ?>" <?php echo $readonly; ?> />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="orden-compra">Orden de compra</label>
+								<input class="form-control mayuscula" type="text" id="orden-compra" name="orden-compra" placeholder="Orden de compra" onkeyup="javascript:this.value=this.value.toUpperCase();" value="<?php echo $rowSelectComprobante['ord_compra']; ?>" <?php echo $readonly; ?> />
+							</div>
+							<!--********************************************************************-->
+							
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="condicion-pago">Condición de pago</label>
+                                <select class="form-control selectpicker" id="condicion-pago" data-live-search="true" <?php echo $disabled; ?> > 
+    								<?php 
+							        	$selectCondicionPago = 'SELECT par.* FROM parametros par WHERE par.padre = 38 AND par.par_estado = 1 ORDER BY par.codigo ASC';
+    									$resultSelectCondicionPago = mysqli_query($con, $selectCondicionPago);
+    									while ($rowSelectCondicionPago = mysqli_fetch_assoc($resultSelectCondicionPago)) 
+    									{
+    								?>
+    								value="<?php echo $rowSelectComprobante['condicion_pago']; ?>"
+    								<option value="<?php echo $rowSelectCondicionPago['codigo']; ?>" <?php echo ($rowSelectCondicionPago['codigo'] == $rowSelectComprobante['condicion_pago']) ? "selected" : "" ?> >
+    								    <?php echo $rowSelectCondicionPago['codigo']." - ".$rowSelectCondicionPago['descripcion']; ?>
+    								</option>
+    								<?php 
+    									}
+    								?>
+                                </select>
+							</div>
+							<div class="col-lg-3 col-mb-12 col-sm-12" id="div-agregar-cuotas" style="display:none;">
+								<label>&nbsp;</label>
+								<button type="button" id="btn-cuotas" class="form-control btn btn-success" data-toggle="modal" data-target="#mod-agregar-cuota" title="agregar cuotas">
+									<i class="fa fa-plus"></i> Agregar cuotas</button>
+							</div>
+							
+							<!--********************************************************************-->
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="observaciones">Observaciones</label>
+								<textarea class="form-control mayuscula" rows="4" id="observaciones" name="observaciones" placeholder="Observaciones" 
+									onkeyup="javascript:this.value=this.value.toUpperCase();" <?php echo $readonly; ?> ><?php echo $rowSelectComprobante['observaciones']; ?></textarea>
+							</div>
+						</div>
+						<div class="col-lg-4 col-mb-4 col-sm-12" id="div-medio-pago">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label>Medio de pago</label>
+							</div>
+							<?php 
+								$selectMedioPago = 'SELECT par.* FROM parametros par WHERE par.padre = 4 AND par.par_estado = 1 ORDER BY descripcion ASC';
+								$resultSelectMedioPago = mysqli_query($con, $selectMedioPago);
+								while ($rowSelectMedioPago = mysqli_fetch_assoc($resultSelectMedioPago)) 
+								{
+									$checkedPagos = "";
+									$readOnly     = "readOnly";
+									$montoPagado  = "";
+										
+									if (!$resultSelectPagos = mysqli_query($con, $selectPagos)) {
+										exit(mysqli_error($con));
+									}
+									
+									if (mysqli_num_rows($resultSelectPagos) > 0) 
+									{
+										while ($rowSelectPagos = mysqli_fetch_assoc($resultSelectPagos)) 
+										{
+											if ($rowSelectPagos['codigo_medio_pago'] == $rowSelectMedioPago['codigo'])
+											{
+												$checkedPagos = "checked";
+												$readOnly     = $rowSelectComprobante['emitido'] == "1" ? "readOnly" : "";
+												$montoPagado  = $rowSelectPagos['monto'];
+											}
+										}
+									}
+							?>
+							<div class="col-lg-7 col-mb-6 col-sm-6">
+								<div class="checkbox">
+									<label><input type="checkbox" value="<?php echo $rowSelectMedioPago['codigo']; ?>" id="CB<?php echo $rowSelectMedioPago['codigo']; ?>" name="CB<?php echo $rowSelectMedioPago['codigo']; ?>" onchange="if(this.checked==true){document.getElementById('MP<?php echo $rowSelectMedioPago['codigo']; ?>').readOnly=false;document.getElementById('MP<?php echo $rowSelectMedioPago['codigo']; ?>').value='';}else{document.getElementById('MP<?php echo $rowSelectMedioPago['codigo']; ?>').readOnly=true;document.getElementById('MP<?php echo $rowSelectMedioPago['codigo']; ?>').value='';}" <?php echo $checkedPagos; ?> <?php echo $disabled; ?> /><?php echo $rowSelectMedioPago['descripcion']; ?></label>
+								</div>
+							</div>
+							<div class="col-lg-5 col-mb-6 col-sm-6">
+								<input class="form-control derecha" type="text" id="MP<?php echo $rowSelectMedioPago['codigo']; ?>" name="MP<?php echo $rowSelectMedioPago['codigo']; ?>" value="<?php echo number_format($montoPagado, 2, '.', ''); ?>" <?php echo $readOnly; ?> />
+							</div>
+							<?php
+								}
+							?>
+						</div>
+						<div class="col-lg-4 col-mb-4 col-sm-12" id="div-cuotas" style="display: none">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label>Cuotas</label>
+							</div>
+						    <div id="act-detalle-cuotas">
+						        <table class="table table-striped table-bordered">
+                				<thead>
+                					<tr>
+                						<th width="10%">N°</th>
+                						<th width="35%">Fecha</th>
+                						<th width="30%">Monto</th>
+                						<th width="25%">&nbsp;</th>
+                					</tr>
+                				</thead>
+                				<tbody>
+                                    <?php
+                                		$number           = 1;
+                                		$montoTotalCuotas = 0;
+                                		
+        								if(mysqli_num_rows($resultSelectCuotas) > 0) 
+        								{
+        									while ($rowSelectCuotas = mysqli_fetch_assoc($resultSelectCuotas)) 
+        									{
+                                    ?>
+                					<tr>
+                						<td><?php echo $number; ?></td>
+                						<td class="derecha"><?php echo $rowSelectCuotas['fecha']; ?></td>
+                						<td class="derecha"><?php echo number_format($rowSelectCuotas['monto'], 2, '.', ''); ?></td>
+                						<td>
+                							<label onclick="cargarCuota('<?php echo $rowSelectCuotas['id']; ?>')" class="btn btn-default btn-circle" 
+                									data-toggle="tooltip" title="editar">
+                								<i class="fa fa-pencil"></i>
+                							</label>
+                							<label onclick="eliminarCuota('<?php echo $rowSelectCuotas['id']; ?>')" class="btn btn-danger btn-circle" 
+                									data-toggle="tooltip" title="eliminar">
+                								<i class="fa fa-times"></i>
+                							</label>
+                						</td>
+                					</tr>
+                				</tbody>
+                                    <?php 
+                            			        $montoTotalCuotas += $rowSelectCuotas['monto'];
+                            			        $number++;
+                            		        }
+                            		
+                            		$montoTotalCuotas = round($montoTotalCuotas, 2);
+                                    ?>
+                				<tfoot>
+                					<tr>
+                						<td>&nbsp;</td>
+                						<td class="derecha negrita" >Monto total</td>
+                						<td class="derecha negrita" ><?php echo number_format($montoTotalCuotas, 2, '.', ''); ?></td>
+                						<td>&nbsp;</td>
+                					</tr>
+                					<input type="hidden" id="monto-total-cuotas" name="monto-total-cuotas" value="<?php echo $montoTotalCuotas; ?>">
+                				</tfoot>
+                                    <?php 
+                                    	}
+                                    	else
+                                    	{
+                                    ?>
+                					<tr><td colspan="4">Aún no se han agregado cuotas.</td></tr>
+                				</tbody>
+                                    <?php 
+                                    	}
+                                    ?> 
+                			</table>
+						    </div>
+						</div>
+					</div>
+					<div class="panel-body">
+						<button type="button" class="btn btn-success" data-toggle="modal" data-target="#mod-agregar-producto" title="agregar productos" <?php echo $disabled; ?> >Agregar productos</button>
+					</div>
+					<!-- /.col-lg-12 -->
+					<div class="panel-body">
+						<div id="act-detalle-comprobante"><!--div id="detalle-comprobantee"-->
+							<table class="table table-striped table-bordered">
+								<thead>
+									<tr>
+										<th width="3%">N°</th>
+										<th width="55%">Producto</th>
+										<th width="10%">Cantidad</th>
+										<th width="10%">Precio unit.</th>
+										<th width="10%">Precio total</th>
+										<th width="8%">&nbsp;</th>
+									</tr>
+								</thead>
+								<tbody>
+								
+							<?php
+								$number        = 1;
+								$montototal    = 0;
+								$montoneto     = 0;
+								$montoigv      = 0;
+								$montoEnLetras = "-";
+								
+								if(mysqli_num_rows($resultSelectDetComprobante) > 0) 
+								{
+									while ($rowSelectDetComprobante = mysqli_fetch_assoc($resultSelectDetComprobante)) 
+									{
+										$cargar   = $disabled == "disabled" ? "" : "onclick=\"cargarDetComprobante2('" .$rowSelectDetComprobante['id']. "')\"";
+										$eliminar = $disabled == "disabled" ? "" : "onclick=\"eliminarDetComprobante2('" .$rowSelectDetComprobante['id']. "')\"";
+							?>
+									<tr>
+										<td><?php echo $number; ?></td>
+							<?php 
+										if ($rowSelectDetComprobante['unidad_medida'] == 3)
+										{
+							?>
+										<td><?php echo $rowSelectDetComprobante['des_producto']. ' - ' .$rowSelectDetComprobante['cantidad']. ' - ' .$rowSelectDetComprobante['espesor']. 'X' .$rowSelectDetComprobante['ancho']. 'X' .$rowSelectDetComprobante['largo']; ?></td>
+							<?php 
+										}
+										else 
+										{
+							?>
+										<td><?php echo $rowSelectDetComprobante['des_producto']; ?></td>
+							<?php
+										}
+							?>
+										<td class="centrar"><?php echo $rowSelectDetComprobante['cantidad_final']; ?></td>
+										<td class="derecha"><?php echo number_format($rowSelectDetComprobante['precio_unitario'], 2, '.', ''); ?></td>
+										<td class="derecha"><?php echo number_format($rowSelectDetComprobante['precio_total'], 2, '.', ''); ?></td>
+										<td>
+											<label <?php echo $cargar; ?> class="btn btn-default btn-circle" data-toggle="tooltip" title="editar">
+												<i class="fa fa-pencil"></i>
+											</label>
+											<label <?php echo $eliminar; ?> class="btn btn-danger btn-circle" data-toggle="tooltip" title="eliminar">
+												<i class="fa fa-times"></i>
+											</label>
+										</td>
+									</tr>
+							<?php 
+										$_SESSION['rows'][$number] = $row;
+										$montototal += $rowSelectDetComprobante['precio_total'];
+										$number++;
+									}
+									$_SESSION['num-registros'] = $number;
+									$montoneto = round($montototal/1.18, 2);
+									$montoigv  = $montototal - $montoneto;
+									
+									$metodoReflex  = new ReflectionMethod('numerosALetras', 'to_word');
+									$montoEnLetras = $metodoReflex->invoke(new numerosALetras(), number_format($montototal, 2, '.', ''), 'PEN');
+								}
+							?>
+								</tbody>
+								<tfoot>
+									<tr>
+										<td colspan="3">Son: <?php echo $montoEnLetras; ?></td>
+										<td>Monto neto</td>
+										<td class="derecha"><?php echo number_format($montoneto, 2, '.', ''); ?></td>
+										<input type="hidden" id="monto-neto" name="monto-neto" value="<?php echo number_format($montoneto, 2, '.', ''); ?>" />
+									</tr>
+									<tr>
+										<td colspan="3">&nbsp;</td>
+										<td>IGV</td>
+										<td class="derecha"><?php echo number_format($montoigv, 2, '.', ''); ?></td>
+										<input type="hidden" id="monto-igv" name="monto-igv" value="<?php echo number_format($montoigv, 2, '.', ''); ?>" />
+									</tr>
+									<tr>
+										<td colspan="3">
+											<div class="checkbox">
+												<label><input type="checkbox" value="entregado" id="cb-entregado" name="cb-entregado"  <?php echo $notDisabled; echo $checkedEntregado; ?> /> Entregado</label>
+											</div>
+										</td>
+										<td>Monto total</td>
+										<td class="derecha"><?php echo number_format($montototal, 2, '.', ''); ?></td>
+										<input type="hidden" id="monto-total" name="monto-total" value="<?php echo number_format($montototal, 2, '.', ''); ?>" />
+									</tr>
+								</tfoot>
+							</table>
+						</div>
+					</div>
+					
+					<!--**** Detracciones - inicio - 2024.07.21 ****-->
+					
+					<div class="panel-body" id="div-detracciones" style="<?php echo $rowSelectComprobante['tip_comprobante'] == '1' ? '' : 'display:none;' ?>">
+						<h4>Detracciones</h4>
+						<div class="col-lg-4 col-mb-4 col-sm-12">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="aplica-detraccion">¿Aplica detracción?</label>
+                                <select class="form-control selectpicker" id="aplica-detraccion" data-live-search="true" <?php echo $disabled; ?> > 
+    								<?php 
+							        	$selectAplicaDetraccion = 'SELECT par.* FROM parametros par WHERE par.padre = 42 AND par.par_estado = 1 ORDER BY par.codigo ASC';
+    									$resultSelectAplicaDetraccion = mysqli_query($con, $selectAplicaDetraccion);
+    									while ($rowSelectAplicaDetraccion = mysqli_fetch_assoc($resultSelectAplicaDetraccion)) 
+    									{
+    								?>
+									<option value="<?php echo $rowSelectAplicaDetraccion['codigo']; ?>" <?php echo ($rowSelectAplicaDetraccion['descripcion'] == $rowSelectComprobante['desc_aplica_detraccion']) ? "selected" : "" ?> data-tokens='<?php echo $rowSelectAplicaDetraccion['codigo']; ?>'>
+										<?php echo $rowSelectAplicaDetraccion['descripcion']; ?>
+									</option>
+    								<?php 
+    									}
+    								?>
+                                </select>
+							</div>
+						</div>
+						<div class="col-lg-8 col-mb-8 col-sm-12" id="div-detalle-detracciones" style="<?php echo $rowSelectComprobante['desc_aplica_detraccion'] == 'No' ? 'display:none;' : 'display:inline;' ?>">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="leyenda-detraccion">Leyenda</label>
+								<input class="form-control" type="text" id="leyenda-detraccion" name="leyenda-detraccion" 
+									value="Operación sujeta al Sistema de Pago de Obligaciones Tributarias con el Gobierno Central" disabled />
+							</div>
+							<div class="col-lg-6 col-mb-6 col-sm-12">
+								<label for="bien-servicio-detraccion">Tipo de bien o servicio</label>
+                                <select class="form-control selectpicker" id="bien-servicio-detraccion" data-live-search="true" <?php echo $disabled; ?> > 
+    								<?php 
+							        	$selectTipoDetraccion = 'SELECT par.* FROM parametros par WHERE par.padre = 68 AND par.par_estado = 1 ORDER BY par.id ASC';
+    									$resultSelectTipoDetraccion = mysqli_query($con, $selectTipoDetraccion);
+    									while ($rowSelectTipoDetraccion = mysqli_fetch_assoc($resultSelectTipoDetraccion)) 
+    									{
+    								?>
+									<option value="<?php echo $rowSelectTipoDetraccion['codigo']; ?>" <?php echo ($rowSelectTipoDetraccion['descripcion'] == $rowSelectComprobante['desc_tip_detraccion']) ? "selected" : "" ?> data-tokens='<?php echo $rowSelectTipoDetraccion['codigo'].$rowSelectTipoDetraccion['descripcion']; ?>'>
+										<?php echo $rowSelectTipoDetraccion['descripcion']; ?>
+									</option>
+    								<?php 
+    									}
+    								?>
+                                </select>
+							</div>
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="medio-pago-detraccion">Medio de pago</label>
+                                <select class="form-control selectpicker" id="medio-pago-detraccion" data-live-search="true" <?php echo $disabled; ?> > 
+    								<?php 
+							        	$selectMedioPagoDetraccion = 'SELECT par.* FROM parametros par WHERE par.padre = 45 AND par.par_estado = 1 ORDER BY par.id ASC';
+    									$resultSelectMedioPagoDetraccion = mysqli_query($con, $selectMedioPagoDetraccion);
+    									while ($rowSelectMedioPagoDetraccion = mysqli_fetch_assoc($resultSelectMedioPagoDetraccion)) 
+    									{
+    								?>
+									<option value="<?php echo $rowSelectMedioPagoDetraccion['codigo']; ?>" <?php echo ($rowSelectMedioPagoDetraccion['descripcion'] == $rowSelectComprobante['desc_tip_detraccion']) ? "selected" : "" ?> data-tokens='<?php echo $rowSelectMedioPagoDetraccion['codigo'].$rowSelectMedioPagoDetraccion['descripcion']; ?>'>
+										<?php echo $rowSelectMedioPagoDetraccion['descripcion']; ?>
+									</option>
+    								<?php 
+    									}
+    								?>
+                                </select>
+							</div>
+							<div class="col-lg-4 col-mb-6 col-sm-12">
+								<label for="numero-cuenta-detraccion">Número cuenta BN</label>
+								<input class="form-control" type="text" id="numero-cuenta-detraccion" name="numero-cuenta-detraccion" 
+									value="00-062-092416" disabled />
+							</div>
+							<div class="col-lg-4 col-mb-6 col-sm-12">
+								<label for="porcentaje-detraccion-visual">Porcentaje de detracción</label>
+								<input class="form-control derecha" type="text" id="porcentaje-detraccion-visual" name="porcentaje-detraccion-visual" 
+									value="<?php echo $rowSelectComprobante['por_detraccion'] . "%"; ?>" disabled />
+								<input type="hidden" id="porcentaje-detraccion" name="porcentaje-detraccion" value="<?php echo $rowSelectComprobante['por_detraccion']; ?>" />
+							</div>
+							<div class="col-lg-4 col-mb-6 col-sm-12">
+								<label for="monto-detraccion">Monto de detracción</label>
+								<input class="form-control derecha" type="text" id="monto-detraccion" name="monto-detraccion" 
+									value="<?php echo $rowSelectComprobante['mon_detraccion']; ?>" disabled />
+							</div>
+						</div>
+					</div>
+					
+					<!--**** Detracciones - fin - 2024.07.26 ****-->
+					
+					
+					<div class="panel-body centrar">
+						<input type="submit" class="btn btn-info" title="actualizar" name="actualizar" onclick="actualizarComprobante()" value="Actualizar" />
+					</div>
+			<?php 
+					}
+				}
+			}
+		} 
+		else 
+		{
+?>
+					<div class="panel-body">
+						<h4>No tiene permisos para ver esta sección.</h4>
+					</div>
+<?php
+		}
+?>
+                </div>
+                <!-- /.row -->
+            </div>
+            <!-- /.container-fluid -->
+        </div>
+        <!-- /#page-wrapper -->
+    </div>
+	
+	<!-- MODAL AGREGAR -->
+	<div class="modal fade" id="mod-agregar-producto" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<form>
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+						<h4 class="modal-title" id="myModalLabel">Agregar producto</h4>
+					</div>
+					<div class="modal-body">
+						<div class="panel-body">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="producto">Producto</label>
+								<select class="form-control selectpicker" id="producto" data-live-search="true" onchange=
+								"$('#codigo').val(this.options[this.selectedIndex].getAttribute('codigo'));
+								 $('#descripcion').val(this.options[this.selectedIndex].getAttribute('descripcion'));
+								 $('#precio').val(this.options[this.selectedIndex].getAttribute('precio'));
+								 $('#un_medida').val(this.options[this.selectedIndex].getAttribute('un_medida'));
+								 $('#cod_um').val(this.options[this.selectedIndex].getAttribute('cod_um'));
+								 mostrarTipo(this.options[this.selectedIndex].getAttribute('cod_um'));" title="-- seleccionar --">
+									<?php 
+										$query = 'SELECT pro.*, par.abreviatura, par.descripcion AS un_medida, par.codigo AS cod_um FROM productos pro JOIN parametros par ON par.codigo = pro.unidad_medida AND par.padre = 29 AND par.par_estado = 1';
+										$result = mysqli_query($con, $query);
+										while ($rows = mysqli_fetch_assoc($result)) 
+										{
+									?>
+									<option codigo='<?php echo $rows['codigo']; ?>' descripcion='<?php echo $rows['descripcion']; ?>' precio='<?php echo number_format($rows['precio'], 2, '.', ''); ?>' un_medida='<?php echo $rows['un_medida']; ?>' cod_um='<?php echo $rows['cod_um']; ?>' value='<?php echo $rows['id']; ?>' data-tokens='<?php echo $rows['codigo'].$rows['descripcion']; ?>'><?php echo $rows['codigo'].' - '.$rows['descripcion'].' ('.$rows['stock'].' '.$rows['abreviatura'].')'; ?>
+									</option>
+									<?php
+										}
+									?>
+								</select>
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="un_medida">Unidad de medida</label>
+								<input class="form-control" type="text" id="un_medida" placeholder="Unidad de medida" disabled />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label id="can" for="cantidad">Cantidad</label>
+								<input class="form-control derecha" type="text" id="cantidad" />
+							</div>
+							<div class="col-lg-2 col-mb-12 col-sm-12">
+								<label id="esp" for="espesor">Espesor</label>
+								<input class="form-control derecha" type="text" id="espesor" />
+							</div>
+							<div class="col-lg-2 col-mb-12 col-sm-12">
+								<label id="anc" for="ancho">Ancho</label>
+								<input class="form-control derecha" type="text" id="ancho" />
+							</div>
+							<div class="col-lg-2 col-mb-12 col-sm-12">
+								<label id="lar" for="largo">Largo</label>
+								<input class="form-control derecha" type="text" id="largo" />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="precio">Precio</label>
+								<input class="form-control derecha" type="text" id="precio" />
+							</div>
+							<input type="hidden" id="codigo">
+							<input type="hidden" id="descripcion">
+							<input type="hidden" id="cod_um">
+						</div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+						<button type="button" class="btn btn-primary" onclick="agregarDetComprobante2()">Agregar</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+	
+	<!-- MODAL ACTUALIZAR PRODUCTO -->
+	<div class="modal fade" id="mod-actualizar-det-comprobante" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+	</div>
+	
+	<!-- MODAL CLIENTE -->
+	<div class="modal fade" id="buscar-cliente" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+	</div>
+	
+    <!-- /#wrapper -->
+    <!-- jQuery -->
+    <script src="../../vendor/jquery/jquery-3.2.1.min.js"></script>
+    <!-- Bootstrap Core JavaScript -->
+    <script src="../../vendor/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../../vendor/bootstrap/js/bootstrap-datepicker.min.js"></script>
+	<!-- Latest compiled and minified JavaScript -->
+	<script src="../../vendor/bootstrap/js/bootstrap-select.min.js"></script>
+    <!-- Metis Menu Plugin JavaScript -->
+    <script src="../../vendor/metisMenu/metisMenu.min.js"></script>
+    <!-- Custom Theme JavaScript -->
+    <script src="../../dist/js/sb-admin-2.js"></script>
+	<!-- Custom JS file -->
+	<script type="text/javascript" src="../../js/script.js"></script>
+	<script type="text/javascript" src="../../js/util.js"></script>
+	<script type="text/javascript">
+		if (document.getElementById('emitido').value == 0) {
+            document.getElementById('condicion-pago').disabled = false;
+		    if (document.getElementById('condicion-pago').value == 2) {
+                document.getElementById('div-medio-pago').style.display = 'none';
+                document.getElementById('div-cuotas').style.display = '';
+                document.getElementById('btn-cuotas').disabled = false;
+            } else {
+                document.getElementById('div-medio-pago').style.display = '';
+                document.getElementById('div-cuotas').style.display = 'none';
+                document.getElementById('btn-cuotas').disabled = true;
+            };
+            document.getElementById('condicion-pago').addEventListener('change', function() {
+                if (this.value == 2) {
+                    document.getElementById('div-medio-pago').style.display = 'none';
+                    document.getElementById('div-cuotas').style.display = '';
+                    document.getElementById('btn-cuotas').disabled = false;
+                } else {
+                    document.getElementById('div-medio-pago').style.display = '';
+                    document.getElementById('div-cuotas').style.display = 'none';
+                    document.getElementById('btn-cuotas').disabled = true;
+                }
+                console.log('ID seleccionado: ', this.value);
+            });
+		} else {
+            document.getElementById('condicion-pago').disabled = true;
+            document.getElementById('btn-cuotas').disabled = true;
+		}
+	</script>
+</body>
+</html>
+<?php
+	} 
+	else 
+	{
+		header('Location: login.php');
+	}
+?>

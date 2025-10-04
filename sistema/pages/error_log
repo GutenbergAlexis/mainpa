@@ -1,0 +1,5 @@
+[29-May-2025 21:46:27 UTC] PHP Warning:  mysqli::__construct(): (HY000/1203): User ttxicknh_mainpa_user already has more than 'max_user_connections' active connections in /home/ttxicknh/public_html/sistema/util/database.php on line 13
+[29-May-2025 21:46:28 UTC] PHP Warning:  mysqli::__construct(): (HY000/1203): User ttxicknh_mainpa_user already has more than 'max_user_connections' active connections in /home/ttxicknh/public_html/sistema/util/database.php on line 13
+[29-May-2025 21:46:35 UTC] PHP Warning:  mysqli::__construct(): (HY000/1203): User ttxicknh_mainpa_user already has more than 'max_user_connections' active connections in /home/ttxicknh/public_html/sistema/util/database.php on line 13
+[29-May-2025 21:46:36 UTC] PHP Warning:  mysqli::__construct(): (HY000/1203): User ttxicknh_mainpa_user already has more than 'max_user_connections' active connections in /home/ttxicknh/public_html/sistema/util/database.php on line 13
+[29-May-2025 21:46:42 UTC] PHP Warning:  mysqli::__construct(): (HY000/1203): User ttxicknh_mainpa_user already has more than 'max_user_connections' active connections in /home/ttxicknh/public_html/sistema/util/database.php on line 13

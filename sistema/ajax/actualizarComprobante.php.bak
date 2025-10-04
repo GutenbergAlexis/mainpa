@@ -1,0 +1,138 @@
+<?php
+	include('../util/database.php');
+	session_start();
+
+	$idComprobante        = $_POST['idComprobante'];
+	$tipoComprobante      = $_POST['tipoComprobante'];
+	$numeroDocumento      = $_POST['numeroDocumento'];
+	$idCliente            = $_POST['idCliente'];
+	$guiaRemision         = $_POST['guiaRemision'];
+	$observaciones        = mb_convert_encoding($_POST['observaciones'], 'UTF-8', 'ISO-8859-1');
+	$ordenCompra          = $_POST['ordenCompra'];
+	$montoNeto            = $_POST['montoNeto'];
+	$montoIgv             = $_POST['montoIgv'];
+	$montoTotal           = $_POST['montoTotal'];
+	$entregado            = $_POST['entregado'];
+	
+    /** Detracción - inicio **/
+    $aplicaDetraccion     = $_POST['aplicaDetraccion'];
+    $bienServicioDet      = $_POST['bienServicioDet'];
+    $medioPagoDet         = $_POST['medioPagoDet'];
+    $porcentajeDet        = $_POST['porcentajeDet'];
+    $montoDet             = $_POST['montoDet'];
+    /** Detracción - fin **/
+
+	$usuario              = $_SESSION['user'];
+	$medioPago            = array();
+	$montoPagado          = array();
+    
+	$vMontoTotal          = 0.0;
+	$respuesta['mensaje'] = "";
+	$fechaActual          = date('d-m-Y H:i:s');
+	
+	//Inicio validaciones
+	if (empty($tipoComprobante))
+	{
+		$respuesta['mensaje'] .= "-Debe escoger un tipo de comprobante.\n";
+	}
+	else
+	{
+		if (empty($idCliente))
+		{
+			$respuesta['mensaje'] .=  "-Debe ingresar un cliente.\n";
+		}
+		else
+		{
+			if ($tipoComprobante == 1)
+			{
+				$respuesta['mensaje'] .= strlen($numeroDocumento) != 11 ? "-El número de documento debe tener 11 dígitos.\n" : "";
+			}
+			else 
+			{
+				$respuesta['mensaje'] .= strlen($numeroDocumento) != 8 ? "-El número de documento debe tener 8 dígitos.\n" : "";
+			}
+		}
+	}
+	
+	$medioPago   = $_POST['medioPago'];
+	$montoPagado = $_POST['montoPagado'];
+	
+	if (empty($medioPago))
+	{
+		$respuesta['mensaje'] .= "-Debe ingresar al menos un medio de pago.\n";
+	}
+	else 
+	{
+		if ((count($montoPagado) == 1 && !empty($montoPagado[0])) || count($montoPagado) > 1) 
+		{
+			for ($i = 0; $i < count($montoPagado); $i++) 
+			{
+				$vMontoTotal += $montoPagado[$i];
+			}
+			
+			$respuesta['mensaje'] .= $vMontoTotal != $montoTotal ? "-El monto a pagar no corresponde con el calculado en el comprobante.\n" : "";
+		}
+	}
+	
+	/* Detracciones - inicio */
+	if ($tipoComprobante == 1 && $montoTotal <= 700 && $aplicaDetraccion == 1) 
+	{
+	    $respuesta['mensaje'] .= "-La detracción solo es aplicable a facturas con monto mayor a S/ 700.00.\n";
+	}
+	
+	$aplicaDetraccion = $aplicaDetraccion == 1 ? "true" : "false";
+	
+	/* Detracciones - fin*/
+
+	//Fin validaciones
+	
+	if (empty($respuesta['mensaje'])) //Consultar si existe alguna validación
+	{
+		$updateComprobante = 
+			"UPDATE comprobantes 
+				SET tip_comprobante = '$tipoComprobante', id_cliente = '$idCliente', guia_remision = '$guiaRemision', 
+					observaciones = '$observaciones', ord_compra = '$ordenCompra', mon_neto = '$montoNeto', 
+					mon_igv = '$montoIgv', mon_total = '$montoTotal', entregado = '$entregado', aplica_detraccion = '$aplicaDetraccion', 
+					tip_detraccion = '$bienServicioDet', por_detraccion = '$porcentajeDet', mon_detraccion = '$montoDet', cod_medio_pago_detraccion = '$medioPagoDet', 
+					usu_modificacion = '$usuario', fec_modificacion = STR_TO_DATE('$fechaActual', '%d-%m-%Y %H:%i:%s') 
+				WHERE id = '$idComprobante'";
+				
+		if (!$resultUpdateComprobante = mysqli_query($con, $updateComprobante)) 
+		{
+			exit(mysqli_error($con));
+		}
+			
+		$deletePagos = 
+			"DELETE FROM pagos 
+				WHERE id_comprobante = $idComprobante";
+		
+		if (!$resultDeletePagos = mysqli_query($con, $deletePagos)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		for ($i = 0; $i < count($medioPago); $i++) 
+		{
+			$vMedioPago   = $medioPago[$i];
+			$vMontoPagado = count($montoPagado) == 1 ? $montoTotal : $montoPagado[$i];
+			
+			$insertPagos = 
+				"INSERT INTO pagos (id_comprobante, codigo_medio_pago, monto) 
+					VALUES ('$idComprobante', '$vMedioPago', '$vMontoPagado')";
+			
+			if (!$resultInsertPagos = mysqli_query($con, $insertPagos)) 
+			{
+				exit(mysqli_error($con));
+			}
+		}
+		
+		$respuesta['estado']  = 0;
+		$respuesta['mensaje'] = "-Comprobante [$idComprobante] actualizado correctamente.";
+	}
+	else
+	{
+		$respuesta['estado'] = 200;
+	}
+	
+	echo json_encode($respuesta);
+?>

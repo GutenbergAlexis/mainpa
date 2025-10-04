@@ -1,0 +1,46 @@
+.centrar{
+  text-align:center;
+}
+.derecha{
+  text-align:right;
+}
+.izquierda{
+  text-align:left;
+}
+.negrita{
+  font-weight:bold;
+}
+.mayuscula{
+  text-transform:uppercase;
+}
+.tabla-cabecera{
+  text-align: center;
+  vertical-align: middle !important;
+  background-color: #0b874b !important;
+  color: white !important;
+  font-weight: bold !important;
+  letter-spacing: 0.3px !important;
+}
+.tabla-detalle{
+  vertical-align: middle !important;
+}
+.btn-custom-buscar {
+  background-color: #6c757d;
+  color: white;
+  border-color: #545b62;
+}
+.btn-custom-buscar:hover {
+  background-color: #5a6268;
+  color: white;
+  border-color: #545b62;
+}
+.btn-custom-agregar {
+  background-color: #0b874b;
+  color: white;
+  border-color: #096b3c;
+}
+.btn-custom-agregar:hover {
+  background-color: #096b3c;
+  color: white;
+  border-color: #07552f;
+}

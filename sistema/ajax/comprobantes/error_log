@@ -1,0 +1,15 @@
+[31-Mar-2025 23:24:57 America/Lima] Número de filas en resultSelectCuotas: 3
+[31-Mar-2025 23:24:57 America/Lima] Número de cuotas encontradas: 3
+[31-Mar-2025 23:24:57 America/Lima] Datos de cuotas: [{"cuota":1,"fecha_de_pago":"01-04-2025 23:59:59","importe":"1"},{"cuota":2,"fecha_de_pago":"02-04-2025 23:59:59","importe":"2"},{"cuota":3,"fecha_de_pago":"03-04-2025 23:59:59","importe":"3"}]
+[31-Mar-2025 23:24:57 America/Lima] Condición de pago: CREDITO
+[31-Mar-2025 23:24:57 America/Lima] Es crédito: Sí
+[31-Mar-2025 23:34:19 America/Lima] Número de filas en resultSelectCuotas: 3
+[31-Mar-2025 23:34:19 America/Lima] Número de cuotas encontradas: 3
+[31-Mar-2025 23:34:19 America/Lima] Datos de cuotas: [{"cuota":1,"fecha_de_pago":"01-04-2025 23:59:59","importe":"3"},{"cuota":2,"fecha_de_pago":"03-04-2025 23:59:59","importe":"2"},{"cuota":3,"fecha_de_pago":"05-04-2025 23:59:59","importe":"1"}]
+[31-Mar-2025 23:34:19 America/Lima] Condición de pago: CREDITO
+[31-Mar-2025 23:34:19 America/Lima] Es crédito: Sí
+[01-Apr-2025 08:29:04 America/Lima] Número de filas en resultSelectCuotas: 2
+[01-Apr-2025 08:29:04 America/Lima] Número de cuotas encontradas: 2
+[01-Apr-2025 08:29:04 America/Lima] Datos de cuotas: [{"cuota":1,"fecha_de_pago":"02-04-2025 23:59:59","importe":"1"},{"cuota":2,"fecha_de_pago":"03-04-2025 23:59:59","importe":"2"}]
+[01-Apr-2025 08:29:04 America/Lima] Condición de pago: CREDITO
+[01-Apr-2025 08:29:04 America/Lima] Es crédito: Sí

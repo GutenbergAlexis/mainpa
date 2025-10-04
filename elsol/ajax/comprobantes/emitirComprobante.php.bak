@@ -1,0 +1,584 @@
+<?php
+	include('../../util/database.php');
+	include('../../util/numerosALetras.php');
+	include('../../x/detComprobante.php');
+	session_start();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>Respuesta Sunat</title>
+	<link rel="shortcut icon" href="../img/favicon.ico">
+    <!-- Bootstrap Core CSS -->
+    <link href="../../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../vendor/bootstrap/css/bootstrap-datepicker3.standalone.min.css" rel="stylesheet">
+	<!-- Latest compiled and minified CSS -->
+	<link href="../../vendor/bootstrap/css/bootstrap-select.min.css" rel="stylesheet">
+    <!-- MetisMenu CSS -->
+    <link href="../../vendor/metisMenu/metisMenu.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="../../dist/css/sb-admin-2.css" rel="stylesheet">
+    <!-- Custom Fonts -->
+    <link href="../../vendor/font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+</head>
+<body>
+    <div id="wrapper">
+        <div id="page-wrapper">
+            <div class="container-fluid">
+                <div class="row">
+					<div class="panel-body">
+
+<?php 
+	$idComprobante        = $_POST['id-comprobante'];
+	$montoTotal           = $_POST['monto-total'];
+	//$condicionPago        = $_POST['condicion-pago'];
+	$condicionPago        = $_POST['condicion-pago'] == 2 ? "CREDITO" : "CONTADO";
+	//$condicionPago        = empty($_POST['condicion-pago']) ? "" : $_POST['condicion-pago']." días";
+	//$descMedioPago        = $condicionPago == 2 ? "CREDITO" : "CONTADO";
+	//$descMedioPago        = empty($_POST['desc-medio-pago']) ? "CONTADO" : $_POST['desc-medio-pago'];
+	//$vCondicionPago       = utf8_decode($condicionPago);
+	//$vDescMedioPago       = utf8_decode($descMedioPago);
+	$usuario              = $_SESSION['user'];
+	$medioPago            = array();
+	$montoPagado          = array();
+	$vMontoTotal          = 0.0;
+	$respuesta['mensaje'] = ""; 
+	
+	//Inicio validaciones
+	for ($i = 1; $i <= 10; $i++) 
+	{
+		if ($_POST['CB'.$i] == $i) 
+		{
+			$monto = $_POST['MP'.$i];
+			array_push($medioPago, $i);
+			array_push($montoPagado, $monto);
+		}
+	}
+	
+	$respuesta['mensaje'] .= ($condicionPago == 1 || $condicionPago == "CONTADO") ? (empty($medioPago) ? "-Debe ingresar al menos un medio de pago.\n" : "") : "";
+	
+	if ((count($montoPagado) == 1 && !empty($montoPagado[0])) || count($montoPagado) > 1) 
+	{
+		for ($i = 0; $i < count($montoPagado); $i++) 
+		{
+			$vMontoTotal += $montoPagado[$i];
+		}
+		
+		$respuesta['mensaje'] .= $vMontoTotal != $montoTotal ? "-El monto a pagar no corresponde con el calculado en el comprobante.\n" : "";
+	}
+	//Fin validaciones
+	
+	if (empty($respuesta['mensaje'])) //Consultar si existe alguna validación
+	{
+		$selectComprobante = "
+			SELECT com.id, com.id_cliente, cli.tip_documento, cli.direccion, cli.num_documento, par2.descripcion AS des_tipo_documento, 
+				CONCAT_WS(' ', cli.nombre_razon_social, cli.seg_nombre, cli.pri_apellido, cli.seg_apellido) AS nombre_razon_social, 
+				com.tip_comprobante AS tip_comprobante, par1.descripcion AS des_comprobante, par3.descripcion AS des_med_pago, 
+				com.guia_remision, DATE_FORMAT(com.fec_emision, '%d-%m-%Y %H:%i:%s') AS fec_emision, 
+				DATE_FORMAT(com.fec_vencimiento, '%d-%m-%Y %H:%i:%s') AS fec_ven, com.ord_compra, 
+				IF(com.observaciones = '', '-', com.observaciones) AS observaciones, cli.correo, com.mon_neto, 
+				com.mon_igv, com.mon_total, com.aplica_detraccion, com.tip_detraccion, com.por_detraccion, 
+				com.mon_detraccion, com.cod_medio_pago_detraccion, com.usu_creacion, 
+                IF(cuo.fecha is null, DATE_FORMAT(com.fec_vencimiento, '%d-%m-%Y %H:%i:%s'), cuo.fecha) as fec_vencimiento 
+			FROM comprobantes com 
+			JOIN clientes cli ON cli.id = com.id_cliente 
+			JOIN parametros par1 ON par1.codigo = com.tip_comprobante AND par1.padre = 8 
+			JOIN parametros par2 ON par2.codigo = cli.tip_documento AND par2.padre = 12 
+			LEFT JOIN parametros par3 ON par3.codigo = com.par_medio_pago AND par3.padre = 4 
+            LEFT JOIN cuotas cuo ON cuo.id_comprobante = com.id 
+			WHERE com.id = '$idComprobante' 
+            ORDER BY cuo.fecha DESC 
+            LIMIT 1";
+		
+		$selectCuotas = "
+		    SELECT DATE_FORMAT(cuo.fecha, '%d-%m-%Y %H:%i:%s') as fecha_cuota, cuo.monto 
+		    FROM cuotas cuo 
+		    WHERE cuo.id_comprobante = '$idComprobante' 
+		    ORDER BY cuo.fecha ASC";
+				
+		$selectDetComprobante = "
+		    SELECT dcom.id_producto AS id_producto, pro.codigo AS cod_producto, pro.descripcion AS des_producto, dcom.cantidad, 
+				dcom.precio AS precio_unitario, dcom.precio*dcom.cantidad_final precio_total, pro.unidad_medida, 
+				dcom.espesor, dcom.ancho, dcom.largo, dcom.cantidad_final, par.abreviatura AS abr_unidad_medida 
+			FROM det_comprobante dcom
+			JOIN productos pro ON pro.id = dcom.id_producto 
+			JOIN parametros par ON par.codigo = pro.unidad_medida 
+			WHERE par.padre = 29 AND dcom.id_comprobante = '$idComprobante'";
+				
+		$deletePagos = "
+		    DELETE FROM pagos 
+			WHERE id_comprobante = '$idComprobante'";
+				
+		$selectDetPagos = "
+			SELECT det.descripcion as medio_pago 
+			FROM pagos pag 
+			JOIN parametros det ON det.codigo = pag.codigo_medio_pago 
+			JOIN parametros cab ON cab.id = det.padre and cab.descripcion = 'Medios de Pago'
+			WHERE pag.id_comprobante = '$idComprobante'";
+		
+		if (!$resultDeletePagos = mysqli_query($con, $deletePagos)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		for ($i = 0; $i < count($medioPago); $i++) 
+		{
+			$vMedioPago   = $medioPago[$i];
+			$vMontoPagado = count($montoPagado) == 1 ? $montoTotal : $montoPagado[$i];
+			
+			$insertPagos = "
+				INSERT INTO pagos (id_comprobante, codigo_medio_pago, monto) 
+				VALUES ('$idComprobante', '$vMedioPago', '$vMontoPagado')";
+			
+			if (!$resultInsertPagos = mysqli_query($con, $insertPagos)) 
+			{
+				exit(mysqli_error($con));
+			}
+		}
+		
+		if (!$resultSelectComprobante = mysqli_query($con, $selectComprobante)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+	    if (!$resultSelectCuotas = mysqli_query($con, $selectCuotas)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		if (!$resultSelectDetComprobante = mysqli_query($con, $selectDetComprobante)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		if (!$resultSelectDetPagos = mysqli_query($con, $selectDetPagos)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		/*
+		#########################################################
+		#### INTEGRACIÓN FÁCIL ####
+		+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		# ESTE CÓDIGO FUNCIONA PARA LA VERSIÓN ONLINE Y OFFLINE
+		# Visita www.nubefact.com/integracion para más información
+		+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+		#########################################################
+		#### FORMA DE TRABAJO ####
+		+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		# PASO 1: Conseguir una RUTA y un TOKEN para trabajar con NUBEFACT (Regístrate o ingresa a tu cuenta en www.nubefact.com).
+		# PASO 2: Generar un archivo en formato .JSON o .TXT con una estructura que se detalla en este documento.
+		# PASO 3: Enviar el archivo generado a nuestra WEB SERVICE ONLINE u OFFLINE según corresponda usando la RUTA y el TOKEN.
+		# PASO 4: Generamos el archivo XML y PDF (Según especificaciones de la SUNAT) y te devolveremos INSTANTÁNEAMENTE los datos del documento generado.
+		# Para ver el documento generado ingresa a www.nubefact.com/login con tus datos de acceso, y luego a la opción "Ver Facturas, Boletas y Notas"
+		# IMPORTANTE: Enviaremos el XML generado a la SUNAT y lo almacenaremos junto con el PDF, XML y CDR en la NUBE para que tu cliente pueda consultarlo en cualquier momento, si así lo desea.
+		+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+		#########################################################
+		#### PASO 1: CONSEGUIR LA RUTA Y TOKEN ####
+		+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		# - Regístrate gratis en www.nubefact.com/register
+		# - Ir la opción API (Integración).
+		# IMPORTANTE: Para que la opción API esté activada necesitas escribirnos a soporte@nubefact.com o llámanos al teléfono: 01 468 3535 (opción 2) o celular (WhatsApp) 955 598762.
+		+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		 * 
+		 * 
+		 */ 
+
+		// RUTA para enviar documentos
+		//$ruta = "https://www.nubefact.com/api/v1/c50fb9e7-1b7f-48de-8398-219df1a6b417";
+		$ruta = "https://api.nubefact.com/api/v1/85f4c219-d242-41c7-81b5-d4b99ea44242";
+
+		//TOKEN para enviar documentos
+		//$token = "2c19da69d71a44e6b9c0de0db6acdaf459357dcdcd954fe4abf52f0443709dc2";
+		$token = "1a85dc84f5c94e4889178169606934f258554de60056466eaba06bd44acd3020";
+
+		/*
+		#########################################################
+		#### PASO 2: GENERAR EL ARCHIVO PARA ENVIAR A NUBEFACT ####
+		+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		# - MANUAL para archivo JSON en el link: https://goo.gl/WHMmSb
+		# - MANUAL para archivo TXT en el link: https://goo.gl/Lz7hAq
+		+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+		 */
+		 
+		date_default_timezone_set("America/Lima");
+		
+		if (mysqli_num_rows($resultSelectComprobante) > 0) 
+		{
+			while ($rowSelectComprobante = mysqli_fetch_assoc($resultSelectComprobante)) 
+			{
+				$tipoComprobante = $rowSelectComprobante['tip_comprobante'];
+				
+				$selectNumeroComprobante = "
+					SELECT ser.ser_comprobante, ser.num_comprobante 
+					FROM serie_comprobante ser 
+					WHERE ser.tip_comprobante = '$tipoComprobante' 
+						AND ser.estado = '1'";
+				
+				if (!$resultSelectNumeroComprobante = mysqli_query($con, $selectNumeroComprobante)) 
+				{
+					exit(mysqli_error($con));
+				}
+				
+				while ($rowSelectNumeroComprobante = mysqli_fetch_assoc($resultSelectNumeroComprobante)) 
+				{
+					$serieComprobante  = $rowSelectNumeroComprobante['ser_comprobante'];
+					$numeroComprobante = $rowSelectNumeroComprobante['num_comprobante'] + 1;
+				}
+				
+				$formato = "A5";
+				if($rowSelectComprobante['tip_comprobante'] == 2) 
+				{
+					$formato = "TICKET";
+				}
+				
+				$desVenta = array();
+				
+				if(mysqli_num_rows($resultSelectDetComprobante) > 0) 
+				{
+					while ($rowSelectDetComprobante = mysqli_fetch_assoc($resultSelectDetComprobante)) 
+					{
+						$selectStockProducto = "
+							SELECT pro.id, pro.stock 
+							FROM productos pro 
+							WHERE pro.id = $rowSelectDetComprobante[id_producto]";
+						
+						if (!$resultSelectStockProducto = mysqli_query($con, $selectStockProducto)) 
+						{
+							exit(mysqli_error($con));
+						}
+						
+						while ($rowSelectStockProducto = mysqli_fetch_assoc($resultSelectStockProducto)) 
+						{
+							$stockProducto = $rowSelectStockProducto['stock'] - $rowSelectDetComprobante['cantidad_final'];
+						}
+						
+						$updateStockProducto = "
+							UPDATE productos pro 
+							SET pro.stock = $stockProducto 
+							WHERE pro.id = $rowSelectDetComprobante[id_producto]";
+						
+						if (!$resultUpdateStockProducto = mysqli_query($con, $updateStockProducto)) 
+						{
+							exit(mysqli_error($con));
+						}
+						
+						if ($rowSelectDetComprobante['unidad_medida'] == 3) 
+						{
+							$descripcion = $rowSelectDetComprobante['des_producto'].'-'.$rowSelectDetComprobante['cantidad'].'-'.$rowSelectDetComprobante['espesor'].'X'.$rowSelectDetComprobante['ancho'].'X'.$rowSelectDetComprobante['largo'];
+						} 
+						else 
+						{
+							$descripcion = $rowSelectDetComprobante['des_producto'];
+						}
+						
+						$desVenta[] = array(
+							"unidad_de_medida"          => $rowSelectDetComprobante['abr_unidad_medida'],
+							"codigo"                    => $rowSelectDetComprobante['cod_producto'],
+							"descripcion"               => mb_convert_encoding($descripcion, 'UTF-8', 'ISO-8859-1'),
+							"cantidad"                  => $rowSelectDetComprobante['cantidad_final'],
+							"valor_unitario"            => $rowSelectDetComprobante['precio_unitario']/1.18,
+							"precio_unitario"           => $rowSelectDetComprobante['precio_unitario'],
+							"descuento"                 => "",
+							"subtotal"                  => $rowSelectDetComprobante['cantidad_final']*$rowSelectDetComprobante['precio_unitario']/1.18,
+							"tipo_de_igv"               => "1",
+							"igv"                       => $rowSelectDetComprobante['cantidad_final']*$rowSelectDetComprobante['precio_unitario']*0.18/1.18,
+							"total"                     => $rowSelectDetComprobante['cantidad_final']*$rowSelectDetComprobante['precio_unitario'],
+							"anticipo_regularizacion"   => "false",
+							"anticipo_documento_serie"  => "",
+							"anticipo_documento_numero" => ""
+						);
+					}
+				}
+				
+				$vendedor = array();
+				
+				$vendedor[] = array(
+					"codigo"  => "vendedor", 
+					"detalle" => $rowSelectComprobante['usu_creacion']
+				);
+				
+				$guia = array();
+				
+				if (strpos($rowSelectComprobante['guia_remision'], '-') !== false) 
+				{
+					$guia[] = array(
+						"guia_tipo"         => "1", 
+						"guia_serie_numero" => $rowSelectComprobante['guia_remision']
+					);
+				}
+				
+				$cuotas = array();
+				
+        		if ($condicionPago == 2 || $condicionPago == "CREDITO") 
+        		{
+    				if(mysqli_num_rows($resultSelectCuotas) > 0) 
+    				{
+    				    $number = 1;
+    				    
+    					while ($rowSelectCuota = mysqli_fetch_assoc($resultSelectCuotas)) 
+    					{
+    						$cuotas[] = array(
+    							"cuota"         => $number,
+    							"fecha_de_pago" => $rowSelectCuota['fecha_cuota'],
+    							"importe"       => $rowSelectCuota['monto']
+    						);
+    						
+    						$number++;
+    					}
+    				}
+				}
+
+				$descMedioPago = "";
+
+				if(mysqli_num_rows($resultSelectDetPagos) > 0) 
+    			{
+					while ($rowSelectDetPagos = mysqli_fetch_assoc($resultSelectDetPagos)) 
+					{
+						$descMedioPago .= $rowSelectDetPagos['medio_pago'].", ";
+					}
+
+					$descMedioPago = substr($descMedioPago, 0, strlen($descMedioPago) - 2);
+				}
+
+				$nota          = utf8_decode("\n\nNota: Una vez entregado el material, no hay cambios ni devoluciones. El plazo de recojo es de 72 horas, luego se le cobrará el costo de almacenaje.");
+
+				$observaciones = $rowSelectComprobante['observaciones'];
+
+				if($rowSelectComprobante['tip_comprobante'] == 1 || $rowSelectComprobante['tip_comprobante'] == 2) 
+				{
+					$observaciones = $observaciones . $nota;
+				}
+				
+				$data = array(
+					"operacion"				            => "generar_comprobante", 
+					"tipo_de_comprobante"               => $rowSelectComprobante['tip_comprobante'], 
+					"serie"                             => $serieComprobante, 
+					"numero"				            => $numeroComprobante, 
+					"sunat_transaction"			        => $rowSelectComprobante['aplica_detraccion'] == 'false' ? "1" : "30", //1: Venta interna, 30: Venta con detracción
+					"cliente_tipo_de_documento"		    => $rowSelectComprobante['tip_documento'], 
+					"cliente_numero_de_documento"	    => $rowSelectComprobante['num_documento'], 
+					"cliente_denominacion"              => mb_convert_encoding(trim($rowSelectComprobante['nombre_razon_social']), 'UTF-8', 'ISO-8859-1'), 
+					"cliente_direccion"                 => mb_convert_encoding(trim($rowSelectComprobante['direccion']), 'UTF-8', 'ISO-8859-1'), 
+					"cliente_email"                     => $rowSelectComprobante['correo'], 
+					"cliente_email_1"                   => "", 
+					"cliente_email_2"                   => "", 
+					"fecha_de_emision"                  => $rowSelectComprobante['fec_emision'], 
+					"fecha_de_vencimiento"              => $rowSelectComprobante['fec_vencimiento'], 
+					"moneda"                            => "1", 
+					"tipo_de_cambio"                    => "", 
+					"porcentaje_de_igv"                 => "18.00", 
+					"descuento_global"                  => "", 
+					"descuento_global"                  => "", 
+					"total_descuento"                   => "", 
+					"total_anticipo"                    => "", 
+					"total_gravada"                     => $rowSelectComprobante['mon_neto'], 
+					"total_inafecta"                    => "", 
+					"total_exonerada"                   => "", 
+					"total_igv"                         => $rowSelectComprobante['mon_igv'], 
+					"total_gratuita"                    => "", 
+					"total_otros_cargos"                => "", 
+					"total"                             => $rowSelectComprobante['mon_total'], 
+					"percepcion_tipo"                   => "", 
+					"percepcion_base_imponible"         => "", 
+					"total_percepcion"                  => "", 
+					"total_incluido_percepcion"         => "", 
+					"detraccion"                        => $rowSelectComprobante['aplica_detraccion'], 
+					"detraccion_tipo"                   => $rowSelectComprobante['tip_detraccion'], 
+					"detraccion_total"                  => $rowSelectComprobante['mon_detraccion'], 
+					"detraccion_porcentaje"             => $rowSelectComprobante['por_detraccion'], 
+					"medio_de_pago_detraccion"          => $rowSelectComprobante['cod_medio_pago_detraccion'], 
+					"observaciones"                     => $observaciones, 
+					"documento_que_se_modifica_tipo"    => "", 
+					"documento_que_se_modifica_serie"   => "", 
+					"documento_que_se_modifica_numero"  => "", 
+					"tipo_de_nota_de_credito"           => "", 
+					"tipo_de_nota_de_debito"            => "", 
+					"enviar_automaticamente_a_la_sunat" => "true", 
+					"enviar_automaticamente_al_cliente" => "true", 
+					"codigo_unico"                      => "", 
+					"condiciones_de_pago"               => $condicionPago, 
+					"medio_de_pago"                     => $descMedioPago, 
+					"placa_vehiculo"                    => "", 
+					"orden_compra_servicio"             => $rowSelectComprobante['ord_compra'], 
+					"tabla_personalizada_codigo"        => "", 
+					"formato_de_pdf"                    => $formato, 
+					/*"campos_personalizados"             => $vendedor, */
+					"guias"                             => $guia, 
+					"items"                             => $desVenta, 
+					"venta_al_credito"                  => $cuotas
+				);
+			}
+			
+			$comprobanteEnviado = json_encode($data);
+
+			$comprobanteGuardado = json_encode(str_replace("\n", "", $data));
+			
+			$updateJsonEnvio = "
+					UPDATE comprobantes com 
+					SET com.json_envio_comprobante = '$comprobanteGuardado' 
+					WHERE com.id = '$idComprobante'";
+				
+			/*if (!$resultUpdateJsonEnvio = mysqli_query($con, $updateJsonEnvio)) 
+			{
+				exit(mysqli_error($con));
+			}*/
+
+			if (!mysqli_query($con, $updateJsonEnvio)) {
+				echo "Error al intentar actualizar: " . mysqli_error($con);
+			}
+
+			/*
+			#########################################################
+			#### PASO 3: ENVIAR EL ARCHIVO A NUBEFACT ####
+			+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			# SI ESTÁS TRABAJANDO CON ARCHIVO JSON
+			# - Debes enviar en el HEADER de tu solicitud la siguiente lo siguiente:
+			# Authorization = Token token="8d19d8c7c1f6402687720eab85cd57a54f5a7a3fa163476bbcf381ee2b5e0c69"
+			# Content-Type = application/json
+			# - Adjuntar en el CUERPO o BODY el archivo JSON o TXT
+			# SI ESTÁS TRABAJANDO CON ARCHIVO TXT
+			# - Debes enviar en el HEADER de tu solicitud la siguiente lo siguiente:
+			# Authorization = Token token="8d19d8c7c1f6402687720eab85cd57a54f5a7a3fa163476bbcf381ee2b5e0c69"
+			# Content-Type = text/plain
+			# - Adjuntar en el CUERPO o BODY el archivo JSON o TXT
+			+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			*/
+
+			//Invocamos el servicio de NUBEFACT
+			$ch = curl_init();
+			curl_setopt($ch, CURLOPT_URL, $ruta);
+			curl_setopt(
+				$ch, CURLOPT_HTTPHEADER, array(
+				'Authorization: Token token="'.$token.'"',
+				'Content-Type: application/json',
+				)
+			);
+			curl_setopt($ch, CURLOPT_POST, 1);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+			curl_setopt($ch, CURLOPT_POSTFIELDS, $comprobanteEnviado);
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			$respuesta = curl_exec($ch);
+			curl_close($ch);
+
+			/*
+			 #########################################################
+			#### PASO 4: LEER RESPUESTA DE NUBEFACT ####
+			+++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			# Recibirás una respuesta de NUBEFACT inmediatamente lo cual se debe leer, verificando que no haya errores.
+			# Debes guardar en la base de datos la respuesta que te devolveremos.
+			# Escríbenos a soporte@nubefact.com o llámanos al teléfono: 01 468 3535 (opción 2) o celular (WhatsApp) 955 598762
+			# Puedes imprimir el PDF que nosotros generamos como también generar tu propia representación impresa previa coordinación con nosotros.
+			# La impresión del documento seguirá haciéndose desde tu sistema. Enviaremos el documento por email a tu cliente si así lo indicas en el archivo JSON o TXT.
+			+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+			 */
+
+			$respuestaNubefact = json_decode($respuesta, true);
+			
+			if (isset($respuestaNubefact['errors'])) 
+			{
+				//Mostramos los errores si los hay
+?>
+						<h4>Existen errores en el comprobante</h4>
+						<label>- <?php echo str_ireplace("NubeFacT", "MainpaSoft", $respuestaNubefact['errors']); ?></label>
+<?php 
+			} 
+			else 
+			{
+				$enlace    = $respuestaNubefact['enlace'];
+				$enlacePDF = $enlace.".pdf";
+				
+				$updateNumeroComprobante = "
+					UPDATE serie_comprobante ser 
+					SET ser.num_comprobante = '$numeroComprobante'
+					WHERE ser.ser_comprobante = '$serieComprobante'";
+				
+				if (!$resultUpdateNumeroComprobante = mysqli_query($con, $updateNumeroComprobante)) 
+				{
+					exit(mysqli_error($con));
+				}
+		
+				$updateDatosComprobante = "
+					UPDATE comprobantes com 
+					SET com.ser_comprobante = '$serieComprobante', com.num_comprobante = '$numeroComprobante', 
+						com.emitido = 1, com.condicion_pago = '$condicionPago', 
+						com.desc_medio_pago = '$descMedioPago', com.url = '$enlacePDF', 
+						com.usu_modificacion = '$usuario', com.fec_modificacion = NOW() 
+					WHERE com.id = '$idComprobante'";
+						
+				if (!$resultUpdateDatosComprobante = mysqli_query($con, $updateDatosComprobante)) 
+				{
+					exit(mysqli_error($con));
+				}
+				
+				//Mostramos la respuesta
+?>
+						<h4>Resumen de la compra</h4>
+						<table class="table table-striped table-bordered">
+							<tbody>
+								<tr>
+									<td width="20%">Número de comprobante</td>
+									<td width="80%"><?php echo $respuestaNubefact['serie'].'-'.str_pad($respuestaNubefact['numero'], 6, "0", STR_PAD_LEFT); ?></td>
+								</tr>
+								<tr>
+									<td>Enlace</td>
+									<td><a href="<?php echo $enlace; ?>">Ver comprobante</a></td></td>
+								</tr>
+								<tr>
+									<td>PDF</td>
+									<td><a href="<?php echo $enlacePDF; ?>">pdf</a></td></td>
+								</tr>
+							</tbody>
+						</table>
+				<!--table>
+					<tbody>
+						<tr><th>tipo:</th><td><?php /*echo $respuestaNubefact['tipo_de_comprobante']; ?></td></tr>
+						<tr><th>serie:</th><td><?php echo $respuestaNubefact['serie']; ?></td></tr>
+						<tr><th>numero:</th><td><?php echo $respuestaNubefact['numero']; ?></td></tr>
+						<tr><th>enlace:</th><td><a href="<?php echo $respuestaNubefact['enlace']."pdf"; ?>">Ver comprobante (PDF)</a></td></tr>
+						<tr><th>enlace:</th><td><a href="<?php echo $respuestaNubefact['enlace']; ?>">Ver comprobante</a></td></tr>
+						<tr><th>aceptada_por_sunat:</th><td><?php echo $respuestaNubefact['aceptada_por_sunat']; ?></td></tr>
+						<tr><th>sunat_description:</th><td><?php echo $respuestaNubefact['sunat_description']; ?></td></tr>
+						<tr><th>sunat_note:</th><td><?php echo $respuestaNubefact['sunat_note']; ?></td></tr>
+						<tr><th>sunat_responsecode:</th><td><?php echo $respuestaNubefact['sunat_responsecode']; ?></td></tr>
+						<tr><th>sunat_soap_error:</th><td><?php echo $respuestaNubefact['sunat_soap_error']; ?></td></tr>
+						<tr><th>pdf_zip_base64:</th><td><?php echo $respuestaNubefact['pdf_zip_base64']; ?></td></tr>
+						<tr><th>xml_zip_base64:</th><td><?php echo $respuestaNubefact['xml_zip_base64']; ?></td></tr>
+						<tr><th>cdr_zip_base64:</th><td><?php echo $respuestaNubefact['cdr_zip_base64']; ?></td></tr>
+						<tr><th>codigo_hash:</th><td><?php echo $respuestaNubefact['cadena_para_codigo_qr']; ?></td></tr>
+						<tr><th>codigo_hash:</th><td><?php echo $respuestaNubefact['codigo_hash'];*/ ?></td></tr>
+					</tbody>
+				</table-->
+<?php
+			}
+		}
+	}
+	else
+	{
+?>
+						<h4>Existen errores en el comprobante</h4>
+						<label><?php echo $respuesta['mensaje']; ?></label>
+<?php 
+	}
+?>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>

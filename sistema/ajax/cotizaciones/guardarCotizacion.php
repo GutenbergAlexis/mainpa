@@ -1,0 +1,335 @@
+<?php
+	date_default_timezone_set('America/Lima');
+
+	include('../../util/database.php');
+	include('../../x/cuotas.php');
+	include('../../x/detComprobante.php');
+	session_start();
+	
+	$idCliente            = $_POST['idCliente'];
+	$tipoComprobante      = $_POST['tipoComprobante'];
+	$numeroDocumento      = $_POST['numeroDocumento'];
+	$ordenCompra          = $_POST['ordenCompra'];
+	$guiaRemision         = $_POST['guiaRemision'];
+	$condicionPago        = $_POST['condicionPago'];
+	$descMedioPago        = $condicionPago == 1 ? "CONTADO" : "CREDITO";
+	//$descMedioPago        = empty($_POST['descMedioPago']) ? "CONTADO" : utf8_decode($_POST['descMedioPago']);
+	$observaciones        = mb_convert_encoding($_POST['observaciones'], 'UTF-8', 'ISO-8859-1');
+	$montoNeto            = $_POST['montoNeto'];
+	$montoIGV             = $_POST['montoIGV'];
+	$montoTotal           = $_POST['montoTotal'];
+	$montoTotalCuotas     = $_POST['montoTotalCuotas'];
+	
+    /** Detracción - inicio **/
+    $aplicaDetraccion     = $_POST['aplicaDetraccion'];
+    $bienServicioDet      = $_POST['bienServicioDet'];
+    $medioPagoDet         = $_POST['medioPagoDet'];
+    $porcentajeDet        = $_POST['porcentajeDet'];
+    $montoDet             = $_POST['montoDet'];
+    /** Detracción - fin **/
+	
+	// Procesar cuotas desde JSON si es venta a crédito
+	$cuotas = [];
+	if ($condicionPago == 2 && isset($_POST['cuotasJSON'])) {
+		$cuotasArray = json_decode($_POST['cuotasJSON'], true);
+		if ($cuotasArray) {
+			$idCuota = 1;
+			$montoTotalCuotas = 0;
+			foreach ($cuotasArray as $cuotaItem) {
+				$oCuota = new cuotas($idCuota, 1, $cuotaItem['fecha'], $cuotaItem['monto']);
+				$cuotas[$idCuota] = $oCuota;
+				$montoTotalCuotas += $cuotaItem['monto'];
+				$idCuota++;
+			}
+			$montoTotalCuotas = round($montoTotalCuotas, 2);
+		}
+	} else {
+		$cuotas = $_SESSION['cuotas'] ?? [];
+	}
+	
+	// Procesar productos desde JSON
+	$detCotizacion = [];
+	if (isset($_POST['productosJSON'])) {
+		$productosArray = json_decode($_POST['productosJSON'], true);
+		if ($productosArray) {
+			$idDetCotizacion = 1;
+			foreach ($productosArray as $productoItem) {
+				$oDetComprobante = new detComprobante(
+					$idDetCotizacion,
+					1,
+					$productoItem['idProducto'],
+					$productoItem['codigo'],
+					$productoItem['descripcion'],
+					$productoItem['unMedida'],
+					$productoItem['codUM'],
+					$productoItem['cantidad'],
+					$productoItem['espesor'],
+					$productoItem['ancho'],
+					$productoItem['largo'],
+					$productoItem['cantidadFinal'],
+					$productoItem['precio'],
+					$productoItem['precio'] * $productoItem['cantidadFinal']
+				);
+				$detCotizacion[$idDetCotizacion] = $oDetComprobante;
+				$idDetCotizacion++;
+			}
+		}
+	} else {
+		$detCotizacion = $_SESSION['detComprobante'] ?? [];
+	}
+	
+	$usuario              = $_SESSION['user'];
+	$idCotizacion         = "";
+	$medioPago            = array();
+	$montoPagado          = array();
+	
+    /** Condición de pago Crédito - inicio *
+	$cuotasCredito        = $_POST['cuotasCredito'];
+	$medioPagoCredito     = array();
+	$montoPagadoCredito   = array();
+    /** Condición de pago Crédito - fin **/
+	
+	$vMontoTotal          = 0.0;
+	$respuesta['mensaje'] = "";
+	$fechaActual          = date('d-m-Y H:i:s');
+	
+	//Inicio validaciones
+	if (empty($tipoComprobante))
+	{
+		$respuesta['mensaje'] .= "-Debe escoger un tipo de comprobante.\n";
+	}
+	else
+	{
+		if (empty($idCliente))
+		{
+			$respuesta['mensaje'] .=  "-Debe ingresar un cliente.\n";
+		}
+		else
+		{
+            switch ($tipoComprobante) 
+            {
+                case 1:
+                    $respuesta['mensaje'] .= strlen($numeroDocumento) != 11 ? "-El RUC debe tener 11 dígitos.\n" : "";
+                    break;
+                default:
+                    $respuesta['mensaje'] .= (strlen($numeroDocumento) != 8 && strlen($numeroDocumento) != 12) ? "-El DNI debe tener 8 dígitos y CE 12 dígitos.\n" : "";
+                    break;
+            }
+		}
+	}
+	
+	if (empty($detCotizacion))
+	{
+		$respuesta['mensaje'] .= "-Debe agregar al menos un producto.\n";
+	}
+	else 
+	{
+		foreach ($detCotizacion as $item) 
+		{
+			$idProducto = $item->getIdProducto();
+			
+			$selectStockProducto = 
+				"SELECT descripcion, stock 
+					FROM productos pro 
+					WHERE pro.id = '$idProducto'";
+			
+			if (!$resultSelectStockProducto = mysqli_query($con, $selectStockProducto)) 
+			{
+				exit(mysqli_error($con));
+			}
+			
+			while ($rowSelectStockProducto = mysqli_fetch_assoc($resultSelectStockProducto)) 
+			{
+				$stock       = $rowSelectStockProducto['stock'];
+				$descripcion = $rowSelectStockProducto['descripcion'];
+			}
+			
+			$nuevoStock = $stock - $item->getProCantidadFinal();
+			
+			$respuesta['mensaje'] .= $nuevoStock < 0 ? "-No hay stock suficiente para el producto ".$descripcion.".\n": "";
+		}
+		unset($item);
+	}
+	
+	$medioPago   = $_POST['medioPago'];
+	$montoPagado = $_POST['montoPagado'];
+	
+	if ($condicionPago == 1)
+	{
+		if (empty($medioPago))
+		{
+			//$respuesta['mensaje'] .= "-Debe ingresar al menos un medio de pago.\n";
+		}
+		else 
+		{
+			if ((count($montoPagado) == 1 && !empty($montoPagado[0])) || count($montoPagado) > 1) 
+			{
+				for ($i = 0; $i < count($montoPagado); $i++) 
+				{
+					$vMontoTotal += $montoPagado[$i];
+				}
+				
+				$respuesta['mensaje'] .= $vMontoTotal != $montoTotal ? "-El monto a pagar al contado (".number_format($vMontoTotal, 2, '.', '').") no corresponde con el calculado en la cotización (".number_format($montoTotal, 2, '.', '').").\n" : "";
+			}
+		}
+	} 
+	else 
+	{
+	    $respuesta['mensaje'] .= $montoTotalCuotas != $montoTotal ? "-El monto a pagar al crédito (".number_format($montoTotalCuotas, 2, '.', '').") no corresponde con el calculado en el comprobante (".number_format($montoTotal, 2, '.', '').").\n" : "";
+	}
+	
+	/* Inicio - actualización monto máximo sin documento - 2022.11.12*/
+	$selectNumeroDocumento = 
+		"SELECT * 
+			FROM clientes cli 
+			WHERE cli.id = '$idCliente'";
+			
+	if (!$resultSelectNumeroDocumento = mysqli_query($con, $selectNumeroDocumento)) 
+	{
+		exit(mysqli_error($con));
+	}
+	
+	while ($rowSelectNumeroDocumento = mysqli_fetch_assoc($resultSelectNumeroDocumento)) 
+	{
+		$numeroDocumento = $rowSelectNumeroDocumento['num_documento'];
+	}
+	
+	if ($tipoComprobante == 2 && $montoTotal >= 700 && $numeroDocumento == '00000000') 
+	{
+	    $respuesta['mensaje'] .= "-Para boletas con montos mayores o iguales a S/ 700.00 es obligatorio el número de documento del cliente.\n";
+	}
+	/* Fin - actualización monto máximo sin documento - 2022.11.12*/
+	
+	/* Detracciones - inicio */
+	if ($tipoComprobante == 1 && $montoTotal <= 700 && $aplicaDetraccion == 1) 
+	{
+	    $respuesta['mensaje'] .= "-La detracción solo es aplicable a facturas con monto mayor a S/ 700.00.\n";
+	}
+	
+	$aplicaDetraccion = $aplicaDetraccion == 1 ? "true" : "false";
+	
+	/* Detracciones - fin*/
+
+	/*if ($condicionPago !== 1)
+	{
+		foreach ($cuotas as $item) 
+		{
+			$respuesta['mensaje'] .= "- ".$item->getComFechaCuota()." 23:59:59"."\n";
+		}
+	}*/
+	
+	//Fin validaciones
+	
+	if (empty($respuesta['mensaje'])) //Consultar si existe alguna validación
+	{
+		$insertCotizacion = "
+			INSERT INTO cotizaciones(id_cliente, tip_comprobante, fec_emision, fec_vencimiento, 
+				condicion_pago, desc_medio_pago, observaciones, guia_remision, ord_compra, 
+				fec_pago, mon_neto, mon_igv, mon_total, aplica_detraccion, 
+				tip_detraccion, por_detraccion, mon_detraccion, cod_medio_pago_detraccion, 
+				usu_creacion, fec_creacion) 
+			VALUES('$idCliente', '$tipoComprobante', STR_TO_DATE('$fechaActual', '%d-%m-%Y %H:%i:%s'), 
+				DATE_ADD(STR_TO_DATE('$fechaActual', '%d-%m-%Y %H:%i:%s'), INTERVAL '$condicionPago' DAY), 
+				'$condicionPago', '$descMedioPago', '$observaciones', '$guiaRemision', '$ordenCompra', 
+				'$fechaPago', '$montoNeto', '$montoIGV', '$montoTotal', '$aplicaDetraccion', 
+				'$bienServicioDet', '$porcentajeDet', '$montoDet', '$medioPagoDet', 
+				'$usuario', STR_TO_DATE('$fechaActual', '%d-%m-%Y %H:%i:%s'))";
+		
+		if (!$resultInsertCotizacion = mysqli_query($con, $insertCotizacion)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		$selectIdCotizacion = "
+			SELECT MAX(id) as idCotizacion 
+			FROM cotizaciones";
+		
+		if (!$resultSelectIdCotizacion = mysqli_query($con, $selectIdCotizacion)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		while ($rowSelectIdCotizacion = mysqli_fetch_assoc($resultSelectIdCotizacion)) 
+		{
+			$idCotizacion = $rowSelectIdCotizacion['idCotizacion'];
+		}
+		
+		if ($condicionPago == 1)
+	    {
+    		for ($i = 0; $i < count($medioPago); $i++) 
+			{
+				$vMedioPago   = $medioPago[$i];
+				$vMontoPagado = count($montoPagado) == 1 ? $montoTotal : $montoPagado[$i];
+				
+				$insertPagoCotizacion = 
+					"INSERT INTO pago_cotizacion (id_cotizacion, codigo_medio_pago, monto) 
+						VALUES ('$idCotizacion', '$vMedioPago', '$vMontoPagado')";
+				
+				if (!$resultInsertPagoCotizacion = mysqli_query($con, $insertPagoCotizacion)) 
+				{
+					exit(mysqli_error($con));
+				}
+			}
+    	}
+    	else 
+    	{
+    	    foreach ($cuotas as $item) 
+    		{
+    			/*$insertCuota = 
+    				"INSERT INTO cuotas (id_comprobante, fecha, monto) 
+    					VALUES ('".$idCotizacion."', DATE_ADD(STR_TO_DATE('".$item->getComFechaCuota()."', '%d/%m/%Y %h:%i:%s'), INTERVAL 23 HOUR), '".$item->getComMontoCuota()."')";*/
+    			$insertCuota = 
+    				"INSERT INTO cuotas (id_comprobante, fecha, monto) 
+    					VALUES ('".$idCotizacion."', STR_TO_DATE('".$item->getComFechaCuota()." 23:59:59"."', '%Y-%m-%d %H:%i:%s'), '".$item->getComMontoCuota()."')";
+    						
+    			if (!$resultInsertCuota = mysqli_query($con, $insertCuota)) 
+    			{
+    				exit(mysqli_error($con));
+    			}
+    		}
+    		unset($item); 
+    		
+    		/** Condición de pago Crédito - inicio *
+    	    foreach ($cuotasCredito as $itemCredito) 
+    		{
+    			$insertCuotaCredito = 
+    				"INSERT INTO cuotasCredito (id_comprobante, fecha, monto) 
+    					VALUES ('".$idCotizacion."', STR_TO_DATE('".$itemCredito->getComFechaCuota()."', '%d/%m/%Y %h:%i:%s'), '".$itemCredito->getComMontoCuota()."')";
+    						
+    			if (!$resultInsertCuotaCredito = mysqli_query($con, $insertCuotaCredito)) 
+    			{
+    				exit(mysqli_error($con));
+    			}
+    		}
+    		unset($itemCredito);
+    		/** Condición de pago Crédito - fin **/
+    	}
+		
+		foreach ($detCotizacion as $item) 
+		{
+			$insertDetCotizacion = 
+				"INSERT INTO det_cotizacion (id_cotizacion, id_producto, precio, cantidad, espesor, ancho, largo, cantidad_final) 
+					VALUES ('".$idCotizacion."', '".$item->getIdProducto()."', '".$item->getProPrecioUnitario()."', '".$item->getProCantidad()."', 
+					'".$item->getProEspesor()."', '".$item->getProAncho()."', '".$item->getProLargo()."', '".$item->getProCantidadFinal()."')";
+					
+			if (!$resultInsertDetCotizacion = mysqli_query($con, $insertDetCotizacion)) 
+			{
+				exit(mysqli_error($con));
+			}
+		}
+		unset($item);
+		
+		// Ya no necesitamos limpiar las sesiones porque usamos localStorage
+		// $_SESSION['cuotas']         = array();
+		// $_SESSION['detComprobante'] = array();
+		
+		$respuesta['estado']  = 0;
+		$respuesta['mensaje'] = "-Cotización [$idCotizacion] guardada correctamente.";
+	}
+	else
+	{
+		$respuesta['estado'] = 200;
+	}
+	
+	echo json_encode($respuesta);
+?>

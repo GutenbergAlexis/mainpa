@@ -1,0 +1,11 @@
+<?php
+	include('../x/cuotas.php');
+	session_start();
+
+    if(isset($_POST['idCuota']))
+	{
+		$idCuota = $_POST['idCuota'];
+		
+		unset($_SESSION['cuotas'][$idCuota]);
+	}
+?>

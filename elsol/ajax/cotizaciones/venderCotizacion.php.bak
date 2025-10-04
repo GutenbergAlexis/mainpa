@@ -1,0 +1,164 @@
+<?php
+	include('../../util/database.php');
+	include('../../x/detComprobante.php');
+	session_start();
+	
+	$idCotizacion         = $_POST['idCotizacion'];
+	$montoTotal           = $_POST['montoTotal'];
+	$usuario              = $_SESSION['user'];
+	$serieComprobante     = "";
+	$numeroComprobante    = "";
+	$medioPago            = array();
+	$montoPagado          = array();
+	$vMontoTotal          = 0.0;
+	$updateStockProducto  = "";
+	$respuesta['mensaje'] = "";
+	$fechaActual          = date('d-m-Y H:i:s');
+	
+	//Inicio validaciones
+	$selectDetCotizacion = 
+		"SELECT dcot.* 
+			FROM det_cotizacion dcot 
+			WHERE id_cotizacion = '$idCotizacion'";
+	
+	if (!$resultSelectDetCotizacion = mysqli_query($con, $selectDetCotizacion)) 
+	{
+		exit(mysqli_error($con));
+	}
+	
+	while ($rowSelectDetCotizacion = mysqli_fetch_assoc($resultSelectDetCotizacion))  
+	{
+		$idProducto = $rowSelectDetCotizacion['id_producto'];
+		
+		$selectStockProducto = 
+			"SELECT descripcion, stock 
+				FROM productos pro 
+				WHERE pro.id = '$idProducto'";
+		
+		if (!$resultSelectStockProducto = mysqli_query($con, $selectStockProducto)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		while ($rowSelectStockProducto = mysqli_fetch_assoc($resultSelectStockProducto)) 
+		{
+			$stock       = $rowSelectStockProducto['stock'];
+			$descripcion = $rowSelectStockProducto['descripcion'];
+		}
+		
+		$nuevoStock = $stock - $rowSelectDetCotizacion['cantidad_final'];
+		
+		$updateStockProducto = 
+			"UPDATE productos pro 
+				SET pro.stock = '$nuevoStock' 
+					WHERE pro.id = '$idProducto'";
+		
+		$respuesta['mensaje'] .= $nuevoStock < 0 ? "-No hay stock suficiente para el producto ".$descripcion.".\n": "";
+	}
+	
+	$medioPago   = $_POST['medioPago'];
+	$montoPagado = $_POST['montoPagado'];
+	
+	if (empty($medioPago))
+	{
+		$respuesta['mensaje'] .= "-Debe ingresar al menos un medio de pago.\n";
+	}
+	else 
+	{
+		if ((count($montoPagado) == 1 && !empty($montoPagado[0])) || count($montoPagado) > 1) 
+		{
+			for ($i = 0; $i < count($montoPagado); $i++) 
+			{
+				$vMontoTotal += $montoPagado[$i];
+			}
+			
+			$respuesta['mensaje'] .= $vMontoTotal != $montoTotal ? "-El monto a pagar no corresponde con el calculado en el comprobante.\n" : "";
+		}
+	}
+	//Fin validaciones
+	
+	if (empty($respuesta['mensaje'])) //Consultar si existe alguna validación
+	{
+		$insertComprobante = "
+			INSERT INTO comprobantes(id_cliente, tip_comprobante, fec_emision, fec_vencimiento, condicion_pago, 
+				desc_medio_pago, observaciones, guia_remision, ord_compra, mon_neto, mon_igv, mon_total, 
+				aplica_detraccion, tip_detraccion, por_detraccion, mon_detraccion, cod_medio_pago_detraccion, 
+				usu_creacion, fec_creacion) 
+			SELECT cot.id_cliente, cot.tip_comprobante, STR_TO_DATE('$fechaActual', '%d-%m-%Y %H:%i:%s'), 
+				DATE_ADD(STR_TO_DATE('$fechaActual', '%d-%m-%Y %H:%i:%s'), INTERVAL cot.condicion_pago DAY), cot.condicion_pago, 
+				cot.desc_medio_pago, cot.observaciones, cot.guia_remision, cot.ord_compra, cot.mon_neto, cot.mon_igv, cot.mon_total, 
+				cot.aplica_detraccion, cot.tip_detraccion, cot.por_detraccion, cot.mon_detraccion, cot.cod_medio_pago_detraccion, 
+				cot.usu_creacion, STR_TO_DATE('$fechaActual', '%d-%m-%Y %H:%i:%s') 
+			FROM cotizaciones cot 
+			WHERE cot.id = '$idCotizacion'";
+		
+		if (!$resultInsertComprobante = mysqli_query($con, $insertComprobante)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		$selectIdComprobante = "
+			SELECT MAX(id) as idComprobante 
+			FROM comprobantes";
+		
+		if (!$resultSelectIdComprobante = mysqli_query($con, $selectIdComprobante)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		while ($rowSelectIdComprobante = mysqli_fetch_assoc($resultSelectIdComprobante)) 
+		{
+			$idComprobante = $rowSelectIdComprobante['idComprobante'];
+		}
+		
+		for ($i = 0; $i < count($medioPago); $i++) 
+		{
+			$vMedioPago   = $medioPago[$i];
+			$vMontoPagado = count($montoPagado) == 1 ? $montoTotal : $montoPagado[$i];
+			
+			$insertPagos = "
+				INSERT INTO pagos (id_comprobante, codigo_medio_pago, monto) 
+				VALUES ('$idComprobante', '$vMedioPago', '$vMontoPagado')";
+			
+			if (!$resultInsertPagos = mysqli_query($con, $insertPagos)) 
+			{
+				exit(mysqli_error($con));
+			}
+		}
+		
+		$insertDetComprobante = "
+			INSERT INTO det_comprobante (id_comprobante, id_producto, precio, cantidad, espesor, ancho, largo, cantidad_final) 
+			SELECT '$idComprobante', dcot.id_producto, dcot.precio, dcot.cantidad, dcot.espesor, dcot.ancho, dcot.largo, dcot.cantidad_final
+			FROM det_cotizacion dcot 
+			WHERE dcot.id_cotizacion = '$idCotizacion'";
+		
+		$updateCotizacion = "
+			UPDATE cotizaciones cot 
+			SET cot.vendido = '1' 
+			WHERE cot.id = '$idCotizacion'";
+					
+		if (!$resultInsertDetComprobante = mysqli_query($con, $insertDetComprobante)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		if (!$resultUpdateStockProducto = mysqli_query($con, $updateStockProducto)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		if (!$resultCotizacion = mysqli_query($con, $updateCotizacion)) 
+		{
+			exit(mysqli_error($con));
+		}
+		
+		$respuesta['estado']  = 0;
+		$respuesta['mensaje'] = "-Comprobante [$idComprobante] guardado correctamente.";
+	}
+	else
+	{
+		$respuesta['estado'] = 200;
+	}
+	
+	echo json_encode($respuesta);
+?>

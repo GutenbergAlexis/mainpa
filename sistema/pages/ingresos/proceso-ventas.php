@@ -1,0 +1,648 @@
+<?php
+	date_default_timezone_set('America/Lima');
+
+	include('../../util/database.php');
+	include('../../util/numerosALetras.php');
+	include('../../x/detComprobante.php');
+	include('../../x/cuotas.php');
+	session_start();
+	
+	//PRUEBAS 
+	//$invisible; 
+	
+	//if (strtolower($_SESSION['user']) !== 'pventas') { $invisible = 'display: none'; };
+	
+	if (isset($_SESSION['user'])) 
+	{
+		$dias  = array("Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado");
+		$meses = array("ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic");
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!--meta charset="utf-8"-->
+    <!--meta http-equiv="X-UA-Compatible" content="IE=edge"-->
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>Proceso de ventas - Mainpasoft</title>
+	<link rel="shortcut icon" href="../../img/favicon.ico">
+    <!-- Bootstrap Core CSS -->
+    <link href="../../vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../../vendor/bootstrap/css/bootstrap-datepicker3.standalone.min.css" rel="stylesheet">
+	<!-- Latest compiled and minified CSS -->
+	<link href="../../vendor/bootstrap/css/bootstrap-select.min.css" rel="stylesheet">
+    <!-- MetisMenu CSS -->
+    <link href="../../vendor/metisMenu/metisMenu.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="../../dist/css/sb-admin-2.css" rel="stylesheet">
+    <!-- Custom Fonts -->
+    <link href="../../vendor/font-awesome/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href="../../estilos/estilos.css" rel="stylesheet" type="text/css">
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+</head>
+<body>
+    <div id="wrapper">
+        <!-- Navigation -->
+        <nav class="navbar navbar-default navbar-static-top" role="navigation" style="margin-bottom: 0">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-collapse">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+                <a class="navbar-brand" href="#"><img src="../../img/logo.jpg" width="230"></a>
+            </div>
+            <!-- /.navbar-header -->
+            <ul class="nav navbar-top-links navbar-right">
+				<li id="usuario">
+				    <?php echo $dias[date('w')].", ".date('d.').$meses[date('n')-1].date('.Y H:i:s').'. Bienvenid@ '.strtolower($_SESSION['user']).' - '.strtolower($_SESSION['desPerfil']); ?></li>
+				<li class="divider"></li>
+				<li><a href="../logout.php"><i class="fa fa-sign-out fa-fw"></i> Salir</a>
+                </li>
+                <!-- /.dropdown -->
+            </ul>
+            <!-- /.navbar-top-links -->
+            <div class="navbar-default sidebar" role="navigation">
+                <div class="sidebar-nav navbar-collapse">
+                    <ul class="nav" id="side-menu">
+                        <li class="active">
+                            <a href="#"><i class="fa fa-sitemap fa-fw"></i> Ingresos<span class="fa arrow"></span></a>
+                            <ul class="nav nav-second-level">
+                                <li>
+                                    <a class="active" href="#">Proceso de ventas</a>
+                                </li>
+                                <li>
+                                    <a href="buscar-cotizaciones.php">Buscar cotizaciones</a>
+                                </li>
+                                <li>
+                                    <a href="buscar-ventas.php">Buscar ventas</a>
+                                </li>
+                                <li>
+                                    <a href="otros-ingresos.php">Otros</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li>
+                            <a href="#"><i class="fa fa-sitemap fa-fw"></i> Egresos<span class="fa arrow"></span></a>
+                            <ul class="nav nav-second-level">
+                                <li>
+                                    <a href="../egresos/compras.php">Compras</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/servicios.php">Servicios</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/suministros.php">Suministros</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/bancos.php">Bancos</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/personal.php">Personal</a>
+                                </li>
+                                <li>
+                                    <a href="../egresos/otros-egresos.php">Otros</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li>
+                            <a href="#"><i class="fa fa-sitemap fa-fw"></i> Reportes<span class="fa arrow"></span></a>
+                            <ul class="nav nav-second-level">
+                                <li>
+                                    <a href="../reportes/detalle-diario.php">Detalle diario</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-ventas-producto.php">Reporte de ventas por producto</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-ventas-general.php">Reporte de ventas general</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-compras-producto.php">Reporte de compras por producto</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-compras-general.php">Reporte de compras general</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-ingresos-mensual.php">Reporte de ingresos mensual</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-egresos-mensual.php">Reporte de egresos mensual</a>
+                                </li>
+                                <li>
+                                    <a href="../reportes/reporte-resumen-mensual.php">Reporte resumen mensual</a>
+                                </li>
+                            </ul>
+                        </li>
+                        <li>
+                            <a href="#"><i class="fa fa-sitemap fa-fw"></i> Mantenimiento<span class="fa arrow"></span></a>
+                            <ul class="nav nav-second-level">
+                                <li>
+                                    <a href="../mantenimiento/usuarios.php">Usuarios</a>
+                                </li>
+                                <li>
+                                    <a href="../mantenimiento/clientes.php">Clientes</a>
+                                </li>
+                                <li>
+                                    <a href="../mantenimiento/productos.php">Productos</a>
+                                </li>
+                                <li>
+                                    <a href="../mantenimiento/proveedores.php">Proveedores</a>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+                <!-- /.sidebar-collapse -->
+            </div>
+            <!-- /.navbar-static-side -->
+        </nav>
+        <!-- Page Content -->
+        <div id="page-wrapper">
+            <div class="container-fluid">
+                <div class="row">
+					<div class="col-lg-12">
+						<h1 class="page-header">Proceso de ventas</h1>
+					</div>
+<?php
+		if ($_SESSION['perfil'] == 1 || $_SESSION['perfil'] == 3) 
+		{
+		    //$_SESSION['cuotas'] = array();
+		    //$_SESSION['detComprobante'] = array();
+?>
+					<div class="panel-body">
+						<h4>Tipo de comprobante</h4>
+						<div class="col-lg-4 col-mb-6 col-sm-12">
+							<select class="form-control selectpicker" id="tipo-comprobante" data-live-search="true" title="-- seleccionar --">
+								<?php 
+									$selectTipoComprobante = 'SELECT par.* FROM parametros par WHERE par.padre = 8 AND par.par_estado = 1 ORDER BY par.codigo ASC';
+									$resultSelectTipoComprobante = mysqli_query($con, $selectTipoComprobante);
+									while ($rowSelectTipoComprobante = mysqli_fetch_assoc($resultSelectTipoComprobante)) 
+									{
+								?>
+								<option value='<?php echo $rowSelectTipoComprobante['codigo']; ?>' 
+								    data-tokens='<?php echo $rowSelectTipoComprobante['codigo'].$rowSelectTipoComprobante['descripcion']; ?>'>
+								    <?php echo $rowSelectTipoComprobante['codigo'].' - '.$rowSelectTipoComprobante['descripcion']; ?></option>
+								<?php 
+									}
+								?>
+							</select>
+						</div>
+					</div>
+					<div class="panel-body">
+						<h4>Número de documento del cliente</h4>
+						<div class="col-lg-3 col-mb-6 col-sm-12">
+							<input class="form-control" type="text" id="numero-documento" name="numero-documento" placeholder="Número de documento" />
+						</div>
+						<div class="col-lg-2 col-mb-6 col-sm-12">
+							<button type="button" class="btn btn-success btn-circle" data-toggle="modal" onclick="buscarCliente()" title="buscar cliente"><i class="fa fa-search"></i></button>
+							<button type="button" class="btn btn-success btn-circle" data-toggle="modal" data-target="#mod-agregar-cliente" title="agregar cliente"><i class="fa fa-plus"></i></button>
+						</div>
+					</div>
+					<div class="panel-body">
+						<h4>Datos del cliente</h4>
+						<div class="col-lg-8 col-mb-8 col-sm-12">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<input type="hidden" id="id-cliente" name="id-cliente" />
+								<label for="nombre">Nombre/Razón social</label>
+								<input class="form-control mayuscula" type="text" id="nombre" name="nombre" placeholder="Nombre/Razón social" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" readonly />
+							</div>
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="direccion">Dirección</label>
+								<input class="form-control mayuscula" type="text" id="direccion" name="direccion" placeholder="Dirección" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" readonly />
+							</div>
+							<div class="col-lg-6 col-mb-6 col-sm-12">
+								<label for="guia-remision">Guía de remisión</label>
+								<input class="form-control mayuscula" type="text" id="guia-remision" name="guia-remision" placeholder="Guía de remisión" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<div class="col-lg-6 col-mb-6 col-sm-12">
+								<label for="orden-compra">Orden de compra</label>
+								<input class="form-control mayuscula" type="text" id="orden-compra" name="orden-compra" placeholder="Orden de compra" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<!--********************************************************************-->
+							
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="condicion-pago">Condición de pago</label>
+                                <select class="form-control selectpicker" id="condicion-pago" data-live-search="true"> <!-- title="-- seleccionar --"-->
+    								<?php 
+							        	$selectCondicionPago = 'SELECT par.* FROM parametros par WHERE par.padre = 38 AND par.par_estado = 1 ORDER BY par.codigo ASC';
+    									$resultSelectCondicionPago = mysqli_query($con, $selectCondicionPago);
+    									while ($rowSelectCondicionPago = mysqli_fetch_assoc($resultSelectCondicionPago)) 
+    									{
+    								?>
+    								<option value="<?php echo $rowSelectCondicionPago['codigo']; ?>"><?php echo $rowSelectCondicionPago['descripcion']; ?></option>
+    								<?php 
+    									}
+    								?>
+                                </select>
+							</div>
+							<div class="col-lg-3 col-mb-12 col-sm-12" id="div-agregar-cuotas" style="display:none;">
+								<label>&nbsp;</label>
+								<button type="button" id="btn-cuotas" class="form-control btn btn-success" data-toggle="modal" data-target="#mod-agregar-cuota" title="agregar cuotas">
+								    <i class="fa fa-plus"></i> Agregar cuotas</button>
+							</div>
+							
+							<!--********************************************************************-->
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="observaciones">Observaciones</label>
+								<textarea class="form-control mayuscula" rows="4" id="observaciones" name="observaciones" placeholder="Observaciones" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" ></textarea>
+							</div>
+						</div>
+						<div class="col-lg-4 col-mb-4 col-sm-12" id="div-medio-pago">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label>Medio de pago</label>
+							</div>
+							<?php 
+								$selectMedioPago = 'SELECT par.* FROM parametros par WHERE par.padre = 4 AND par.par_estado = 1 ORDER BY par.descripcion ASC';
+								$resultSelectMedioPago = mysqli_query($con, $selectMedioPago);
+								while ($rowSelectMedioPago = mysqli_fetch_assoc($resultSelectMedioPago)) 
+								{
+							?>
+							<div class="col-lg-7 col-mb-6 col-sm-6">
+								<div class="checkbox">
+									<label><input type="checkbox" value="<?php echo $rowSelectMedioPago['codigo']; ?>" id="CB<?php echo $rowSelectMedioPago['codigo']; ?>" 
+									    name="CB<?php echo $rowSelectMedioPago['codigo']; ?>" 
+									    onchange="if(this.checked==true){document.getElementById('MP<?php echo $rowSelectMedioPago['codigo']; ?>').readOnly=false;
+									    document.getElementById('MP<?php echo $rowSelectMedioPago['codigo']; ?>').value='';}
+									    else{document.getElementById('MP<?php echo $rowSelectMedioPago['codigo']; ?>').readOnly=true;
+									    document.getElementById('MP<?php echo $rowSelectMedioPago['codigo']; ?>').value='';}" /><?php echo $rowSelectMedioPago['descripcion']; ?></label>
+								</div>
+							</div>
+							<div class="col-lg-5 col-mb-6 col-sm-6">
+								<input class="form-control derecha" type="number" id="MP<?php echo $rowSelectMedioPago['codigo']; ?>" name="MP<?php echo $rowSelectMedioPago['codigo']; ?>" step="0.01" min="0" readOnly />
+								<!--label for="monto-cuota">Monto</label>
+								<input class="form-control derecha" type="number" id="monto-cuota" name="monto-cuota" placeholder="0.00" step="0.01" min="0" required /-->
+							</div>
+							<?php
+								}
+							?>
+						</div>
+						<div class="col-lg-4 col-mb-4 col-sm-12" id="div-cuotas" style="display: none">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label>Cuotas</label>
+							</div>
+						    <div id="detalle-cuotas"></div>
+						</div>
+					</div>
+					<div class="panel-body">
+						<button type="button" class="btn btn-success" data-toggle="modal" data-target="#mod-agregar-producto" title="agregar productos"><i class="fa fa-plus"></i> Agregar productos
+						</button>
+					</div>
+					<!-- /.col-lg-12 -->
+					<div class="panel-body">
+						<h4>Resumen de la venta</h4>
+						<div id="detalle-comprobante"></div>
+					</div>
+					
+					<!--**** Detracciones - inicio - 2024.07.21 ****-->
+					
+					<div class="panel-body" id="div-detracciones" style="display:none;">
+						<h4>Detracciones</h4>
+						<div class="col-lg-4 col-mb-4 col-sm-12">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="aplica-detraccion">¿Aplica detracción?</label>
+                                <select class="form-control selectpicker" id="aplica-detraccion" data-live-search="true"> 
+    								<?php 
+							        	$selectAplicaDetraccion = 'SELECT par.* FROM parametros par WHERE par.padre = 42 AND par.par_estado = 1 ORDER BY par.codigo ASC';
+    									$resultSelectAplicaDetraccion = mysqli_query($con, $selectAplicaDetraccion);
+    									while ($rowSelectAplicaDetraccion = mysqli_fetch_assoc($resultSelectAplicaDetraccion)) 
+    									{
+    								?>
+    								<option value="<?php echo $rowSelectAplicaDetraccion['codigo']; ?>"><?php echo $rowSelectAplicaDetraccion['descripcion']; ?></option>
+    								<?php 
+    									}
+    								?>
+                                </select>
+							</div>
+						</div>
+						<div class="col-lg-8 col-mb-8 col-sm-12" id="div-detalle-detracciones" style="display:none;">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="leyenda-detraccion">Leyenda</label>
+								<input class="form-control" type="text" id="leyenda-detraccion" name="leyenda-detraccion" 
+								    value="Operación sujeta al Sistema de Pago de Obligaciones Tributarias con el Gobierno Central" disabled />
+							</div>
+							<div class="col-lg-6 col-mb-6 col-sm-12">
+								<label for="bien-servicio-detraccion">Tipo de bien o servicio</label>
+                                <select class="form-control selectpicker" id="bien-servicio-detraccion" data-live-search="true" title="-- seleccionar --"> 
+    								<?php 
+							        	$selectCondicionPago = 'SELECT par.* FROM parametros par WHERE par.padre = 68 AND par.par_estado = 1 ORDER BY par.id ASC';
+    									$resultSelectCondicionPago = mysqli_query($con, $selectCondicionPago);
+    									while ($rowSelectCondicionPago = mysqli_fetch_assoc($resultSelectCondicionPago)) 
+    									{
+    								?>
+    								<option value="<?php echo $rowSelectCondicionPago['codigo']; ?>"><?php echo $rowSelectCondicionPago['descripcion']; ?></option>
+    								<?php 
+    									}
+    								?>
+                                </select>
+							</div>
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="medio-pago-detraccion">Medio de pago</label>
+                                <select class="form-control selectpicker" id="medio-pago-detraccion" data-live-search="true" title="-- seleccionar --"> 
+    								<?php 
+							        	$selectCondicionPago = 'SELECT par.* FROM parametros par WHERE par.padre = 45 AND par.par_estado = 1 ORDER BY par.id ASC';
+    									$resultSelectCondicionPago = mysqli_query($con, $selectCondicionPago);
+    									while ($rowSelectCondicionPago = mysqli_fetch_assoc($resultSelectCondicionPago)) 
+    									{
+    								?>
+    								<option value="<?php echo $rowSelectCondicionPago['codigo']; ?>"><?php echo $rowSelectCondicionPago['descripcion']; ?></option>
+    								<?php 
+    									}
+    								?>
+                                </select>
+							</div>
+							<div class="col-lg-4 col-mb-6 col-sm-12">
+								<label for="numero-cuenta-detraccion">Número cuenta BN</label>
+								<input class="form-control derecha" type="text" id="numero-cuenta-detraccion" name="numero-cuenta-detraccion" value="00-062-092416" disabled />
+							</div>
+							<div class="col-lg-4 col-mb-6 col-sm-12">
+								<label for="porcentaje-detraccion-visual">Porcentaje de detracción</label>
+								<input class="form-control derecha" type="text" id="porcentaje-detraccion-visual" name="porcentaje-detraccion-visual" disabled />
+								<input class="form-control" type="text" id="porcentaje-detraccion" name="porcentaje-detraccion" style="display:none" disabled />
+							</div>
+							<div class="col-lg-4 col-mb-6 col-sm-12">
+								<label for="monto-detraccion">Monto de detracción</label>
+								<input class="form-control derecha" type="text" id="monto-detraccion" name="monto-detraccion" disabled />
+							</div>
+						</div>
+					</div>
+					
+					<!--**** Detracciones - fin - 2024.07.21 ****-->
+					
+					<div class="panel-body centrar">
+						<button type="button" class="btn btn-primary" onclick="guardarComprobante();" title="guardar">Guardar</button>
+						<button type="button" class="btn btn-success" onclick="guardarCotizacion();" title="cotizar">Cotizar</button>
+					</div>
+<?php
+		} 
+		else 
+		{
+?>
+					<div class="panel-body">
+						<h4>No tiene permisos para ver esta sección.</h4>
+					</div>
+<?php
+		}
+?>
+                </div>
+                <!-- /.row -->
+            </div>
+            <!-- /.container-fluid -->
+        </div>
+        <!-- /#page-wrapper -->
+    </div>
+	
+	<!-- MODAL AGREGAR CUOTA -->
+	<div class="modal fade" id="mod-agregar-cuota" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<form>
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+						<h4 class="modal-title" id="myModalLabel">Agregar cuota</h4>
+					</div>
+					<div class="modal-body">
+						<div class="panel-body">
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="fecha-cuota">Fecha</label>
+								<input class="form-control" type="date" id="fecha-cuota" name="fecha-cuota" min="<?php echo date("Y-m-d");?>" required />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="monto-cuota">Monto</label>
+								<input class="form-control derecha" type="number" id="monto-cuota" name="monto-cuota" placeholder="0.00" step="0.01" min="0" required />
+							</div>
+						</div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+						<button type="button" id="btn-agregar-cuota" class="btn btn-primary" onclick="agregarCuota()">Agregar</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+	
+	<!-- MODAL AGREGAR -->
+	<div class="modal fade" id="mod-agregar-producto" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<form>
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+						<h4 class="modal-title" id="myModalLabel">Agregar producto</h4>
+					</div>
+					<div class="modal-body">
+						<div class="panel-body">
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="producto">Producto</label>
+								<select class="form-control selectpicker" id="producto" data-live-search="true" onchange=
+								"$('#codigo').val(this.options[this.selectedIndex].getAttribute('codigo'));
+								 $('#descripcion').val(this.options[this.selectedIndex].getAttribute('descripcion'));
+								 $('#precio').val(this.options[this.selectedIndex].getAttribute('precio'));
+								 $('#un_medida').val(this.options[this.selectedIndex].getAttribute('un_medida'));
+								 $('#cod_um').val(this.options[this.selectedIndex].getAttribute('cod_um'));
+								 mostrarTipo(this.options[this.selectedIndex].getAttribute('cod_um'));" title="-- seleccionar --">
+									<?php 
+										$query = '
+										    SELECT pro.*, par.abreviatura, par.descripcion AS un_medida, par.codigo AS cod_um 
+										    FROM productos pro 
+										    JOIN parametros par ON par.codigo = pro.unidad_medida AND par.padre = 29 AND par.par_estado = 1';
+										$result = mysqli_query($con, $query);
+										while ($rows = mysqli_fetch_assoc($result)) 
+										{
+									?>
+									<option codigo='<?php echo $rows['codigo']; ?>' descripcion='<?php echo $rows['descripcion']; ?>' 
+									    precio='<?php echo number_format($rows['precio'], 2, '.', ''); ?>' un_medida='<?php echo $rows['un_medida']; ?>' cod_um='<?php echo $rows['cod_um']; ?>' 
+									    value='<?php echo $rows['id']; ?>' data-tokens='<?php echo $rows['codigo'].$rows['descripcion']; ?>'>
+									    <?php echo $rows['codigo'].' - '.$rows['descripcion'].' ('.$rows['stock'].' '.$rows['abreviatura'].')'; ?>
+									</option>
+									<?php
+										}
+									?>
+								</select>
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="un_medida">Unidad de medida</label>
+								<input class="form-control" type="text" id="un_medida" placeholder="Unidad de medida" disabled />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label id="can" for="cantidad">Cantidad</label>
+								<input class="form-control derecha" type="text" id="cantidad" />
+							</div>
+							<div class="col-lg-2 col-mb-12 col-sm-12">
+								<label id="esp" for="espesor">Espesor</label>
+								<input class="form-control derecha" type="text" id="espesor" />
+							</div>
+							<div class="col-lg-2 col-mb-12 col-sm-12">
+								<label id="anc" for="ancho">Ancho</label>
+								<input class="form-control derecha" type="text" id="ancho" />
+							</div>
+							<div class="col-lg-2 col-mb-12 col-sm-12">
+								<label id="lar" for="largo">Largo</label>
+								<input class="form-control derecha" type="text" id="largo" />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="precio">Precio</label>
+								<input class="form-control derecha" type="text" id="precio" />
+							</div>
+							<input type="hidden" id="codigo">
+							<input type="hidden" id="descripcion">
+							<input type="hidden" id="cod_um">
+						</div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+						<button type="button" class="btn btn-primary" onclick="agregarDetComprobante()">Agregar</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+	
+	<!-- MODAL ACTUALIZAR PRODUCTO -->
+	<div class="modal fade" id="mod-actualizar-det-comprobante" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+	</div>
+	
+	<!-- MODAL CLIENTE -->
+	<div class="modal fade" id="buscar-cliente" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+	</div>
+	
+	<!-- MODAL OBLIGATORIOS -->
+	<div class="modal fade" id="mod-obligatorios" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+	</div>
+	
+	<!-- MODAL AGREGAR CLIENTE -->
+	<div class="modal fade" id="mod-agregar-cliente" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+		<div class="modal-dialog" role="document">
+			<div class="modal-content">
+				<form>
+					<div class="modal-header">
+						<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+						<h4 class="modal-title" id="myModalLabel">Agregar cliente</h4>
+					</div>
+					<div class="modal-body">
+						<div class="panel-body">
+							<h4>Datos del cliente</h4>
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="agr-tipo-cliente">Tipo Cliente</label>
+								<label class="radio-inline"><input type="radio" name="agr-tipo-cliente" id="agr-rb-juridica" value="juridica"> Persona jurídica</label>
+								<label class="radio-inline"><input type="radio" name="agr-tipo-cliente" id="agr-rb-natural" value="natural"> Persona natural</label>
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="agr-tipo-documento">Tipo de documento</label>
+								<select class="form-control selectpicker mayuscula" id="agr-tipo-documento" name="agr-tipo-documento" data-live-search="true" title="-- seleccionar --" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" >
+									<?php 
+										$query = 'SELECT par.* FROM parametros par WHERE par.padre = 12 AND par.par_estado = 1 ORDER BY par.codigo ASC';
+										$result = mysqli_query($con, $query);
+										while ($rows = mysqli_fetch_assoc($result)) {
+									?>
+									<option value='<?php echo $rows['codigo']; ?>' data-tokens='<?php echo $rows['codigo'].'.'.$rows['descripcion']; ?>'>
+								        <?php echo $rows['codigo'].'. '.$rows['descripcion']; ?></option>
+									<?php 
+										}
+									?>
+								</select>
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="agr-numero-documento">Número de documento</label>
+								<input class="form-control mayuscula" type="text" id="agr-numero-documento" name="agr-numero-documento" placeholder="Número de documento" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="agr-primer-nombre">Primer nombre/Razón social</label>
+								<input class="form-control mayuscula" type="text" id="agr-primer-nombre" name="agr-primer-nombre" placeholder="Primer nombre/Razón social" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="agr-segundo-nombre">Segundo nombre</label>
+								<input class="form-control mayuscula" type="text" id="agr-segundo-nombre" name="agr-segundo-nombre" placeholder="Segundo nombre" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="agr-primer-apellido">Primer apellido</label>
+								<input class="form-control mayuscula" type="text" id="agr-primer-apellido" name="agr-primer-apellido" placeholder="Primer apellido" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="agr-segundo-apellido">Segundo apellido</label>
+								<input class="form-control mayuscula" type="text" id="agr-segundo-apellido" name="agr-segundo-apellido" placeholder="Segundo apellido" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="agr-direccion">Dirección</label>
+								<input class="form-control mayuscula" type="text" id="agr-direccion" name="agr-direccion" placeholder="Dirección" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="agr-contacto">Contacto</label>
+								<input class="form-control mayuscula" type="text" id="agr-contacto" name="agr-contacto" placeholder="Contacto" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="agr-telefono">Teléfono</label>
+								<input class="form-control mayuscula" type="text" id="agr-telefono" name="agr-telefono" placeholder="Teléfono" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+							<div class="col-lg-6 col-mb-12 col-sm-12">
+								<label for="agr-celular">Celular</label>
+								<input class="form-control" type="text" id="agr-celular" name="agr-celular" placeholder="Celular" />
+							</div>
+							<div class="col-lg-12 col-mb-12 col-sm-12">
+								<label for="agr-correo">Correo electrónico</label>
+								<input class="form-control mayuscula" type="text" id="agr-correo" name="agr-correo" placeholder="Correo electrónico" 
+								    onkeyup="javascript:this.value=this.value.toUpperCase();" />
+							</div>
+						</div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+						<button type="button" class="btn btn-primary" onclick="guardarClienteVenta();" title="guardar">Guardar</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	</div>
+	<!-- MODAL RESPUESTA -->
+	<!--div class="modal fade" id="mod-cargar-respuesta" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+	</div-->
+    <!-- /#wrapper -->
+    <!-- jQuery -->
+    <script src="../../vendor/jquery/jquery-3.2.1.min.js"></script>
+    <!-- Bootstrap Core JavaScript -->
+    <script src="../../vendor/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../../vendor/bootstrap/js/bootstrap-datepicker.min.js"></script>
+	<!-- Latest compiled and minified JavaScript -->
+	<script src="../../vendor/bootstrap/js/bootstrap-select.min.js"></script>
+    <!-- Metis Menu Plugin JavaScript -->
+    <script src="../../vendor/metisMenu/metisMenu.min.js"></script>
+    <!-- Custom Theme JavaScript -->
+    <script src="../../dist/js/sb-admin-2.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-confirm/3.3.0/jquery-confirm.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-confirm/3.3.0/jquery-confirm.min.js"></script>
+	<!-- Custom JS file -->
+	<script type="text/javascript" src="../../js/script.js"></script>
+	<script type="text/javascript" src="../../js/util.js"></script>
+</body>
+</html>
+<?php
+	} 
+	else 
+	{
+		header('Location: ../login.php');
+	}
+?>

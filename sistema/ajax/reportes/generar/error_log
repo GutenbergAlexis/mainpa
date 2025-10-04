@@ -1,0 +1,1 @@
+[14-Mar-2025 12:42:25 America/Lima] PHP Fatal error:  Allowed memory size of 134217728 bytes exhausted (tried to allocate 20480 bytes) in /home/ttxicknh/public_html/sistema/util/PHPExcel/PHPExcel/CachedObjectStorage/CacheBase.php on line 186

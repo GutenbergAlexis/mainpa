@@ -1,0 +1,1278 @@
+$(document).ready(function() {
+ leerDetComprobante();
+ leerDetCompra();
+ leerOtrosIngresos();
+ leerUsuarios();
+ leerClientes();
+ leerProductos();
+ leerProveedores();
+ leerCompras();
+ leerComprobantes();
+ buscarVentas();
+ leerCotizaciones();
+ //AGREGAR CUOTAS  
+ leerCuota();
+});
+
+function buscarVentas() {
+ var codVenta       = document.getElementById('codigo-venta')       ? document.getElementById('codigo-venta').value       : '';
+ var numDocumento   = document.getElementById('numero-documento')   ? document.getElementById('numero-documento').value   : '';
+ var fechaDesde     = document.getElementById('fecha-desde')        ? document.getElementById('fecha-desde').value        : '';
+ var fechaHasta     = document.getElementById('fecha-hasta')        ? document.getElementById('fecha-hasta').value        : '';
+ var numComprobante = document.getElementById('numero-comprobante') ? document.getElementById('numero-comprobante').value : '';
+ 
+ $.post("../../ajax/buscarVentas.php", {
+  codVenta       : codVenta, 
+  numDocumento   : numDocumento, 
+  fechaDesde     : fechaDesde, 
+  fechaHasta     : fechaHasta, 
+  numComprobante : numComprobante
+ }, function(data, status) {
+  if (document.getElementById('ventas')) {
+   document.getElementById('ventas').innerHTML = data;
+  }
+ });
+}
+
+function buscarCliente() {
+ var numDocumento = document.getElementById('numero-documento').value;
+ 
+ $.post("../../ajax/buscarCliente.php", {
+   numDocumento : numDocumento
+ }, function(data, status) {
+  $("#buscar-cliente").html(data);
+ });
+ $("#buscar-cliente").modal("show");
+}
+
+function agregarCliente() {
+ var idCliente = document.getElementById('cli-id-cliente').value;
+ var nombre    = document.getElementById('cli-nombre-razon-social').value;
+ var direccion = document.getElementById('cli-direccion').value;
+
+ /*$.post("../../pages/ingresos/proceso-ventas.php", {*/
+ $.post("", {
+	 
+ }, function(data, status) {
+  $("#buscar-cliente").modal("hide");
+  document.getElementById('id-cliente').value = idCliente;
+  document.getElementById('nombre').value     = nombre;
+  document.getElementById('direccion').value  = direccion;
+ });
+}
+
+function agregarNoCliente() {
+ $.post("", {
+     
+ }, function(data, status) {
+  $("#cli-dni").prop("checked", false);
+  $("#cli-ruc").prop("checked", false);
+  $("#tipo-documento-final").val("");
+  $("#nombre").val("");
+  $("#direccion").val("");
+ });
+}
+
+function agregarCuota() {
+ var fechaCuota = $("#fecha-cuota").val();
+ var montoCuota = $("#monto-cuota").val();
+ 
+ if (fechaCuota.length === 0 || montoCuota.length === 0) {
+  alert('Se debe ingresar la fecha y el monto de la cuota.');
+ } else if (fechaCuota === 0 || montoCuota === 0) {
+  alert('Se debe ingresar la fecha y el monto de la cuota.');
+ } else {
+
+  $.post("../../ajax/agregarCuota.php", {
+   fechaCuota : fechaCuota, 
+   montoCuota : montoCuota 
+  }, function(data, status) {
+   $("#mod-agregar-cuota").modal("hide");
+
+   leerCuota();
+   
+   $("#fecha-cuota").val("");
+   $("#monto-cuota").val("");
+  });
+ } 
+ console.log('Fecha cuota: ', fechaCuota);
+ console.log('Monto cuota: ', montoCuota);
+}
+
+function agregarDetComprobante() {
+ var idProducto  = $("#producto").val();
+ var unMedida    = $("#un_medida").val();
+ var codUM       = $("#cod_um").val();
+ var codigo      = $("#codigo").val();
+ var descripcion = $("#descripcion").val();
+ var cantidad    = $("#cantidad").val();
+ var espesor     = $("#espesor").val();
+ var ancho       = $("#ancho").val();
+ var largo       = $("#largo").val();
+ var precio      = $("#precio").val();
+
+ $.post("../../ajax/agregarDetComprobante.php", {
+  idProducto  : idProducto, 
+  unMedida    : unMedida, 
+  codUM       : codUM, 
+  codigo      : codigo, 
+  descripcion : descripcion, 
+  cantidad    : cantidad, 
+  espesor     : espesor, 
+  ancho       : ancho, 
+  largo       : largo, 
+  precio      : precio 
+ }, function(data, status) {
+  $("#mod-agregar-producto").modal("hide");
+  
+  leerDetComprobante();
+
+  $("#producto").val("");
+  $("#cantidad").val("");
+  $("#precio").val("");
+  $("#un_medida").val("");
+  $("#espesor").val("");
+  $("#ancho").val("");
+  $("#largo").val("");
+  $("#codigo").val("");
+  $("#producto").selectpicker("refresh");
+ });
+}
+
+function agregarDetComprobante2() {
+ var idComprobante = $("#id-comprobante").val(); 
+ var idProducto    = $("#producto").val();
+ var unMedida      = $("#un_medida").val();
+ var codUM         = $("#cod_um").val();
+ var codigo        = $("#codigo").val();
+ var descripcion   = $("#descripcion").val();
+ var cantidad      = $("#cantidad").val();
+ var espesor       = $("#espesor").val();
+ var ancho         = $("#ancho").val();
+ var largo         = $("#largo").val();
+ var precio        = $("#precio").val();
+
+ $.post("../../ajax/agregarDetComprobante2.php", {
+  idComprobante : idComprobante, 
+  idProducto    : idProducto, 
+  unMedida      : unMedida, 
+  codUM         : codUM, 
+  codigo        : codigo, 
+  descripcion   : descripcion, 
+  cantidad      : cantidad, 
+  espesor       : espesor, 
+  ancho         : ancho, 
+  largo         : largo, 
+  precio        : precio
+ }, function(data, status) {
+  $("#mod-agregar-producto").modal("hide");
+  $("#producto").val("");
+  $("#cantidad").val("");
+  $("#precio").val("");
+  
+  location.reload();
+ });
+}
+
+function leerCuota() {
+ $.get("../../ajax/leerCuotas.php", {}, function(data, status) {
+  $("#detalle-cuotas").html(data);
+ });
+}
+
+function eliminarCuota(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea eliminar la cuota?");
+
+ if (confirmacion === true) {
+  $.post("../../ajax/eliminarCuota.php", {
+    idCuota : id
+  }, function(data, status) {
+   leerCuota();
+  });
+ }
+}
+
+function leerDetComprobante() {
+ $.get("../../ajax/leerDetComprobante.php", {}, function(data, status) {
+  $("#detalle-comprobante").html(data);
+ });
+}
+
+function calcularDetraccion() {
+ alert('Hola detracción!');
+}
+
+function eliminarDetComprobante(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea eliminar el producto?");
+
+ if (confirmacion == true) {
+  $.post("../../ajax/eliminarDetComprobante.php", {
+    idDetComprobante : id
+  }, function(data, status) {
+   leerDetComprobante();
+  });
+ }
+}
+
+function eliminarDetComprobante2(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea eliminar el producto? " + id);
+
+ if (confirmacion == true) {
+  $.post("../../ajax/eliminarDetComprobante2.php", {
+    idDetComprobante : id
+  }, function(data, status) {
+   alert("Se eliminó correctamente el producto.");
+   location.reload();
+  });
+ }
+}
+
+function cargarDetComprobante(id) {
+ $.post("../../ajax/cargarDetComprobante.php", {
+  idDetComprobante : id
+ }, function(data, status) {
+  $("#mod-actualizar-det-comprobante").html(data);
+ });
+ $("#mod-actualizar-det-comprobante").modal("show");
+}
+
+function cargarDetComprobante2(id) {
+ $.post("../../ajax/cargarDetComprobante2.php", {
+  idDetComprobante : id
+ }, function(data, status) {
+  $("#mod-actualizar-det-comprobante").html(data);
+ });
+ $("#mod-actualizar-det-comprobante").modal("show");
+}
+
+function actualizarDetComprobante() {
+ var idDetComprobante = $("#id-det-comprobante").val();
+ var espesor          = $("#act-espesor").val();
+ var ancho            = $("#act-ancho").val();
+ var largo            = $("#act-largo").val();
+ var cantidad         = $("#act-cantidad").val();
+ var precio           = $("#act-precio").val();
+
+ $.post("../../ajax/actualizarDetComprobante.php", {
+  idDetComprobante : idDetComprobante, 
+  espesor          : espesor, 
+  ancho            : ancho, 
+  largo            : largo, 
+  cantidad         : cantidad, 
+  precio           : precio
+ }, function(data, status) {
+  $("#mod-actualizar-det-comprobante").modal("hide");
+  leerDetComprobante();
+ });
+}
+
+function actualizarDetComprobante2() {
+ var idDetComprobante = $("#id-det-comprobante").val();
+ var unidadMedida     = $("#act-unidad-medida").val();
+ var cantidad         = $("#act-cantidad").val();
+ var espesor          = $("#act-espesor").val();
+ var ancho            = $("#act-ancho").val();
+ var largo            = $("#act-largo").val();
+ var precio           = $("#act-precio").val();
+
+ $.post("../../ajax/actualizarDetComprobante2.php", {
+  idDetComprobante : idDetComprobante, 
+  unidadMedida     : unidadMedida, 
+  cantidad         : cantidad, 
+  espesor          : espesor, 
+  ancho            : ancho, 
+  largo            : largo, 
+  precio           : precio
+ }, function(data, status) {
+  $("#mod-actualizar-det-comprobante").modal("hide");
+  location.reload();
+ });
+}
+
+function guardarComprobante() {
+ var tipoComprobante  = $("#tipo-comprobante").val();
+ var idCliente        = $("#id-cliente").val();
+ var numeroDocumento  = $("#numero-documento").val();
+ var ordenCompra      = $("#orden-compra").val();
+ var guiaRemision     = $("#guia-remision").val();
+ var condicionPago    = $("#condicion-pago").val();
+ var descMedioPago    = $("#desc-medio-pago").val();
+ var observaciones    = $("#observaciones").val();
+ var montoNeto        = $("#monto-neto").val();
+ var montoIGV         = $("#monto-igv").val();
+ var montoTotal       = $("#monto-total").val();
+ var montoTotalCuotas = $("#monto-total-cuotas").val();
+ 
+ /** Detracción - inicio **/
+ var aplicaDetraccion = $("#aplica-detraccion").val();
+ var bienServicioDet  = $("#bien-servicio-detraccion").val();
+ var medioPagoDet     = $("#medio-pago-detraccion").val();
+ var porcentajeDet    = $("#porcentaje-detraccion").val();
+ var montoDet         = $("#monto-detraccion").val();
+ /** Detracción - fin **/
+ 
+ var medioPago        = [];
+ var montoPagado      = [];
+ for (i = 1; i <= 10; i++) {
+  if (document.getElementById('CB'+i)) {
+   var monto = document.getElementById('MP'+i).value;
+   if (document.getElementById('CB'+i).checked) {
+	medioPago[medioPago.length]     = i;
+	montoPagado[montoPagado.length] = monto;
+   }
+  }
+ }
+ 
+ /** Condición de pago Crédito - inicio *
+ var medioPagoCredito   = [];
+ var montoPagadoCredito = [];
+ for (i = 1; i <= 10; i++) {
+  if (document.getElementById('CB'+i)) {
+   var monto = document.getElementById('MP'+i).value;
+   if (document.getElementById('CB'+i).checked) {
+	medioPago[medioPago.length]     = i;
+	montoPagado[montoPagado.length] = monto;
+   }
+  }
+ }
+ /** Condición de pago Crédito - fin **/
+ 
+ //alert(aplicaDetraccion + ' ' + bienServicioDet + ' ' + medioPagoDet + ' ' + porcentajeDet + ' ' + montoDet)
+ 
+ $.post('../../ajax/guardarComprobante.php', {
+  tipoComprobante : tipoComprobante, 
+  idCliente       : idCliente, 
+  numeroDocumento : numeroDocumento, 
+  ordenCompra     : ordenCompra, 
+  guiaRemision    : guiaRemision, 
+  condicionPago   : condicionPago, 
+  descMedioPago   : descMedioPago, 
+  observaciones   : observaciones, 
+  montoNeto       : montoNeto, 
+  montoIGV        : montoIGV, 
+  montoTotal      : montoTotal, 
+  montoTotalCuotas: montoTotalCuotas, 
+ 
+  /** Detracción - inicio **/
+  aplicaDetraccion: aplicaDetraccion, 
+  bienServicioDet : bienServicioDet, 
+  medioPagoDet    : medioPagoDet, 
+  porcentajeDet   : porcentajeDet, 
+  montoDet        : montoDet, 
+  /** Detracción - fin **/
+  
+  medioPago       : medioPago, 
+  montoPagado     : montoPagado
+ }, function(data, status) {
+  var respuesta = JSON.parse(data);
+  alert(respuesta['mensaje']);
+  if(respuesta['estado']==0) {
+   window.location.reload(true);
+  }
+ });
+}
+
+function leerComprobantes() {
+ var codVenta       = document.getElementById('codigo-venta')       ? document.getElementById('codigo-venta').value       : '';
+ var numDocumento   = document.getElementById('numero-documento')   ? document.getElementById('numero-documento').value   : '';
+ var fechaDesde     = document.getElementById('fecha-desde')        ? document.getElementById('fecha-desde').value        : '';
+ var fechaHasta     = document.getElementById('fecha-hasta')        ? document.getElementById('fecha-hasta').value        : '';
+ var numComprobante = document.getElementById('numero-comprobante') ? document.getElementById('numero-comprobante').value : '';
+ 
+ $.post("../../ajax/leerComprobantes.php", {
+  codVenta       : codVenta, 
+  numDocumento   : numDocumento, 
+  fechaDesde     : fechaDesde, 
+  fechaHasta     : fechaHasta, 
+  numComprobante : numComprobante
+ }, function(data, status) {
+  if (document.getElementById('comprobantes')) {
+   document.getElementById('comprobantes').innerHTML = data;
+  }
+ });
+}
+
+function cargarComprobante(id) {
+ $.post('../../ajax/cargarComprobante.php', {
+  id: id
+ }, function(data, status) {
+  $('#mod-cargar-comprobante').html(data);
+ });
+ $('#mod-cargar-comprobante').modal('show');
+}
+
+function pagarComprobante(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea pagar este comprobante?");
+ if (confirmacion == true) {
+  $.post("../../ajax/pagarComprobante.php", {
+    id : id
+  }, function(data, status) {
+    leerComprobantes();
+  });
+ }
+}
+
+function verComprobante(id) {
+ $.post("../../ajax/verComprobante.php", {
+  id : id
+ }, function(data, status) {
+  $("#mod-ver-comprobante").html(data);
+ });
+}
+
+function editarComprobante(id) {
+ $.post("../../ajax/editarComprobante.php", {
+  id: id
+ }, function(data, status) {
+  $("#mod-editar-comprobante").html(data);
+  $("#id-comprobante").val(id);
+ });
+ $("#mod-editar-comprobante").modal("show");
+}
+
+function actualizarComprobante() {
+ var idComprobante   = $("#id-comprobante").val();
+ var tipoComprobante = $("#tipo-comprobante").val();
+ var numeroDocumento = $("#numero-documento").val();
+ var idCliente       = $("#id-cliente").val();
+ var guiaRemision    = $("#guia-remision").val();
+ var observaciones   = $("#observaciones").val();
+ var ordenCompra     = $("#orden-compra").val();
+ var montoNeto       = $("#monto-neto").val();
+ var montoIgv        = $("#monto-igv").val();
+ var montoTotal      = $("#monto-total").val();
+ var entregado       = document.getElementById('cb-entregado').checked ? 1 : 0;
+ var medioPago       = [];
+ var montoPagado     = [];
+ for (i = 1; i <= 10; i++) {
+  if (document.getElementById('CB'+i)) {
+   var monto = document.getElementById('MP'+i).value;
+   if (document.getElementById('CB'+i).checked) {
+	medioPago[medioPago.length]     = i;
+	montoPagado[montoPagado.length] = monto;
+   }
+  }
+ }
+ 
+ $.post("../../ajax/actualizarComprobante.php", {
+  idComprobante   : idComprobante, 
+  tipoComprobante : tipoComprobante,
+  numeroDocumento : numeroDocumento, 
+  idCliente       : idCliente, 
+  guiaRemision    : guiaRemision, 
+  observaciones   : observaciones, 
+  ordenCompra     : ordenCompra, 
+  montoNeto       : montoNeto, 
+  montoIgv        : montoIgv, 
+  montoTotal      : montoTotal, 
+  entregado       : entregado, 
+  medioPago       : medioPago, 
+  montoPagado     : montoPagado
+ }, function(data, status) {
+  var respuesta = JSON.parse(data);
+  alert(respuesta['mensaje']);
+  if(respuesta['estado']==0) {
+   window.location.reload(true);
+  }
+ });
+ //window.location.href = "../../pages/ingresos/buscar-ventas.php";
+ buscarVentas();
+}
+
+function anularComprobante(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea anular el comprobante?");
+ 
+ if (confirmacion == true) {
+  $.post("../../ajax/comprobantes/anularComprobante.php", {
+   idComprobante : id
+  }, function(data, status) {
+   var respuesta = JSON.parse(data);
+   alert(respuesta['mensaje']);
+   if(respuesta['estado']==0) {
+    window.location.reload(true);
+   }
+  });
+ }
+ //window.location.href = "../../pages/ingresos/buscar-ventas.php";
+ //buscarVentas();
+}
+
+function guardarOtrosIngresos() {
+ var tipoIngreso   = document.getElementById('rb-jicamarca').checked ? 1 : 
+						(document.getElementById('rb-alquiler').checked ? 2 : 
+						(document.getElementById('rb-pucallpa').checked ? 3 : 
+						(document.getElementById('rb-iquitos').checked ? 4 : 
+						5)));
+ var descripcion   = $("#descripcion").val();
+ var monto         = $("#monto").val();
+ var fecha         = $("#fecha").val();
+ var observaciones = $("#observaciones").val();
+
+ $.post("../../ajax/guardarOtrosIngresos.php", {
+  tipoIngreso   : tipoIngreso, 
+  descripcion   : descripcion, 
+  monto         : monto, 
+  fecha         : fecha, 
+  observaciones : observaciones
+ }, function(data, status) {
+  alert("Se guardó correctamente.");
+  location.reload();
+ });
+}
+
+function leerOtrosIngresos() {
+ $.get("../../ajax/leerOtrosIngresos.php", {
+ }, function(data, status) {
+  $("#otros-ingresos").html(data);
+ });
+}
+
+function buscarOtrosIngresos() {
+ var tipoIngreso = $("#tipo-ingreso").val();
+ var fechaDesde  = $("#fecha-desde").val();
+ var fechaHasta  = $("#fecha-hasta").val();
+ 
+ $.post("../../ajax/buscarOtrosIngresos.php", {
+  tipoIngreso : tipoIngreso, 
+  fechaDesde  : fechaDesde, 
+  fechaHasta  : fechaHasta
+ }, function(data, status) {
+  $("#otros-ingresos").html(data);
+ });
+}
+/* Inicio Usuario */
+function guardarUsuario() {
+ var numDocumento = $("#numero-documento").val();
+ var priNombre    = $("#primer-nombre").val();
+ var segNombre    = $("#segundo-nombre").val();
+ var priApellido  = $("#primer-apellido").val();
+ var segApellido  = $("#segundo-apellido").val();
+ var direccion    = $("#direccion").val();
+ var telefono     = $("#telefono").val();
+ var celular      = $("#celular").val();
+ var correo       = $("#correo").val();
+ var user         = $("#user").val();
+ var pass         = $("#pass").val();
+ var perfil       = $("#perfil").val();
+ 
+ $.post("../../ajax/guardarUsuario.php", {
+  numDocumento : numDocumento, 
+  priNombre    : priNombre, 
+  segNombre    : segNombre, 
+  priApellido  : priApellido, 
+  segApellido  : segApellido, 
+  direccion    : direccion, 
+  telefono     : telefono, 
+  celular      : celular, 
+  correo       : correo, 
+  user         : user, 
+  pass         : pass, 
+  perfil       : perfil
+ }, function(data, status) {
+  alert("Se guardó correctamente.");
+  location.reload();
+ });
+}
+
+function leerUsuarios() {
+ $.get("../../ajax/leerUsuarios.php", {
+ }, function(data, status) {
+  $("#usuarios").html(data);
+ });
+}
+
+function eliminarUsuario(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea eliminar el usuario?");
+
+ if (confirmacion == true) {
+  $.post("../../ajax/eliminarUsuario.php", {
+   idUsuario : id
+  }, function(data, status) {
+   leerUsuarios();
+  });
+ }
+}
+
+function cargarUsuario(id) {
+ $.post("../../ajax/cargarUsuario.php", {
+  idUsuario : id
+ }, function(data, status) {
+  $("#mod-actualizar-usuario").html(data);
+ });
+ $("#mod-actualizar-usuario").modal("show");
+}
+
+function actualizarUsuario() {
+ var idUsuario    = $("#id-usuario").val();
+ var numDocumento = $("#act-numero-documento").val();
+ var priNombre    = $("#act-primer-nombre").val();
+ var segNombre    = $("#act-segundo-nombre").val();
+ var priApellido  = $("#act-primer-apellido").val();
+ var segApellido  = $("#act-segundo-apellido").val();
+ var direccion    = $("#act-direccion").val();
+ var telefono     = $("#act-telefono").val();
+ var celular      = $("#act-celular").val();
+ var correo       = $("#act-correo").val();
+ var user         = $("#act-user").val();
+ var pass         = $("#act-pass").val();
+ var perfil       = $("#act-perfil").val();
+ 
+ $.post("../../ajax/actualizarUsuario.php", {
+  idUsuario    : idUsuario, 
+  numDocumento : numDocumento, 
+  priNombre    : priNombre, 
+  segNombre    : segNombre, 
+  priApellido  : priApellido, 
+  segApellido  : segApellido, 
+  direccion    : direccion, 
+  telefono     : telefono, 
+  celular      : celular, 
+  correo       : correo, 
+  user         : user, 
+  pass         : pass, 
+  perfil       : perfil
+ }, function(data, status) {
+  $("#mod-actualizar-usuario").modal("hide");
+  leerUsuarios();
+ });
+}
+/* Inicio Cliente */
+function guardarCliente() {
+ var tipCliente   = document.getElementById('agr-rb-natural').checked ? 1 : (document.getElementById('agr-rb-juridica').checked ? 2 : 0);
+ var tipDocumento = document.getElementById('agr-tipo-documento').value;
+ var numDocumento = document.getElementById('agr-numero-documento').value;
+ var priNombre    = document.getElementById('agr-primer-nombre').value;
+ var segNombre    = document.getElementById('agr-segundo-nombre').value;
+ var priApellido  = document.getElementById('agr-primer-apellido').value;
+ var segApellido  = document.getElementById('agr-segundo-apellido').value;
+ var direccion    = document.getElementById('agr-direccion').value;
+ var contacto     = document.getElementById('agr-contacto').value;
+ var telefono     = document.getElementById('agr-telefono').value;
+ var celular      = document.getElementById('agr-celular').value;
+ var correo       = document.getElementById('agr-correo').value;
+ 
+ $.post("../../ajax/guardarCliente.php", {
+  tipCliente   : tipCliente, 
+  tipDocumento : tipDocumento, 
+  numDocumento : numDocumento, 
+  priNombre    : priNombre, 
+  segNombre    : segNombre, 
+  priApellido  : priApellido, 
+  segApellido  : segApellido, 
+  direccion    : direccion, 
+  contacto     : contacto, 
+  telefono     : telefono, 
+  celular      : celular, 
+  correo       : correo
+ }, function(data, status) {
+  var respuesta = JSON.parse(data);
+  alert(respuesta['mensaje']);
+  if(respuesta['estado']==0) {
+   window.location.reload(true);
+  }
+ });
+}
+
+function guardarClienteVenta() {
+ var tipCliente   = document.getElementById('agr-rb-natural').checked ? 1 : (document.getElementById('agr-rb-juridica').checked ? 2 : 0);
+ var tipDocumento = document.getElementById('agr-tipo-documento').value;
+ var numDocumento = document.getElementById('agr-numero-documento').value;
+ var priNombre    = document.getElementById('agr-primer-nombre').value;
+ var segNombre    = document.getElementById('agr-segundo-nombre').value;
+ var priApellido  = document.getElementById('agr-primer-apellido').value;
+ var segApellido  = document.getElementById('agr-segundo-apellido').value;
+ var direccion    = document.getElementById('agr-direccion').value;
+ var contacto     = document.getElementById('agr-contacto').value;
+ var telefono     = document.getElementById('agr-telefono').value;
+ var celular      = document.getElementById('agr-celular').value;
+ var correo       = document.getElementById('agr-correo').value;
+ 
+ $.post("../../ajax/guardarCliente.php", {
+  tipCliente   : tipCliente, 
+  tipDocumento : tipDocumento, 
+  numDocumento : numDocumento, 
+  priNombre    : priNombre, 
+  segNombre    : segNombre, 
+  priApellido  : priApellido, 
+  segApellido  : segApellido, 
+  direccion    : direccion, 
+  contacto     : contacto, 
+  telefono     : telefono, 
+  celular      : celular, 
+  correo       : correo
+ }, function(data, status) {
+  var respuesta = JSON.parse(data);
+  alert(respuesta['mensaje']);
+  if(respuesta['estado']==0) {
+   document.getElementById('numero-documento').value = numDocumento;
+   document.getElementById('nombre').value           = priNombre;
+   document.getElementById('direccion').value        = direccion;
+   document.getElementById('id-cliente').value       = respuesta['idCliente'];
+   $("#mod-agregar-cliente").modal("hide");
+  }
+ });
+}
+
+function leerClientes() {
+ $.get("../../ajax/leerClientes.php", {
+	 
+ }, function(data, status) {
+  $("#clientes").html(data);
+ });
+}
+
+function eliminarCliente(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea eliminar el cliente?");
+
+ if (confirmacion == true) {
+  $.post("../../ajax/eliminarCliente.php", {
+   idCliente : id
+  }, function(data, status) {
+   leerClientes();
+  });
+ }
+}
+
+function cargarCliente(id) {
+ $.post("../../ajax/cargarCliente.php", {
+  idCliente : id
+ }, function(data, status) {
+  $("#mod-actualizar-cliente").html(data);
+ });
+ $("#mod-actualizar-cliente").modal("show");
+}
+
+function actualizarCliente() {
+ var idCliente       = $("#id-cliente").val();
+ var tipCliente      = document.getElementById('act-rb-natural').checked ? 1 : 
+						(document.getElementById('act-rb-juridica').checked ? 2 : 0);
+ var numDocumento    = $("#act-numero-documento").val();
+ var primerNombre    = $("#act-primer-nombre").val();
+ var segundoNombre   = $("#act-segundo-nombre").val();
+ var primerApellido  = $("#act-primer-apellido").val();
+ var segundoApellido = $("#act-segundo-apellido").val();
+ var direccion       = $("#act-direccion").val();
+ var contacto        = $("#act-contacto").val();
+ var telefono        = $("#act-telefono").val();
+ var celular         = $("#act-celular").val();
+ var correo          = $("#act-correo").val();
+
+ $.post("../../ajax/actualizarCliente.php", {
+  idCliente       : idCliente, 
+  tipCliente      : tipCliente, 
+  numDocumento    : numDocumento, 
+  primerNombre    : primerNombre, 
+  segundoNombre   : segundoNombre, 
+  primerApellido  : primerApellido, 
+  segundoApellido : segundoApellido, 
+  direccion       : direccion, 
+  contacto        : contacto, 
+  telefono        : telefono, 
+  celular         : celular, 
+  correo          : correo
+ }, function(data, status) {
+  $("#mod-actualizar-cliente").modal("hide");
+  leerClientes();
+ });
+}
+/* Inicio Producto */
+function guardarProducto() {
+ var descripcion = $("#descripcion").val();
+ var unMedida    = $("#unidad-medida").val();
+ var codigo      = $("#codigo").val();
+ var precio      = $("#precio").val();
+ 
+ $.post("../../ajax/guardarProducto.php", {
+  descripcion : descripcion, 
+  unMedida    : unMedida, 
+  codigo      : codigo, 
+  precio      : precio
+ }, function(data, status) {
+  alert("Se guardó correctamente.");
+  location.reload();
+ });
+}
+
+function leerProductos() {
+ $.get("../../ajax/leerProductos.php", {
+	 
+ }, function(data, status) {
+  $("#productos").html(data);
+ });
+}
+
+function eliminarProducto(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea eliminar el producto?");
+
+ if (confirmacion == true) {
+  $.post("../../ajax/eliminarProducto.php", {
+   idProducto : id
+  }, function(data, status) {
+   leerProductos();
+  });
+ }
+}
+
+function cargarProducto(id) {
+ $.post("../../ajax/cargarProducto.php", {
+  idProducto : id
+ }, function(data, status) {
+  $("#mod-actualizar-producto").html(data);
+ });
+ $("#mod-actualizar-producto").modal("show");
+}
+
+function actualizarProducto() {
+ var idProducto  = $("#id-producto").val();
+ var descripcion = $("#act-descripcion").val();
+ var codigo      = $("#act-codigo").val();
+ var precio      = $("#act-precio").val();
+ var stock       = $("#act-stock").val();
+
+ $.post("../../ajax/actualizarProducto.php", {
+  idProducto  : idProducto, 
+  descripcion : descripcion, 
+  codigo      : codigo, 
+  precio      : precio, 
+  stock       : stock
+ }, function(data, status) {
+  $("#mod-actualizar-producto").modal("hide");
+  leerProductos();
+ });
+}
+/* Inicio Proveedor */
+function guardarProveedor() {
+ var ruc         = $("#ruc").val();
+ var razonSocial = $("#razon-social").val();
+ var direccion   = $("#direccion").val();
+ var contacto    = $("#contacto").val();
+ var telefono    = $("#telefono").val();
+ var correo      = $("#correo").val();
+ 
+ $.post("../../ajax/guardarProveedor.php", {
+  ruc         : ruc, 
+  razonSocial : razonSocial, 
+  direccion   : direccion, 
+  contacto    : contacto, 
+  telefono    : telefono, 
+  correo      : correo
+ }, function(data, status) {
+  alert("Se guardó correctamente.");
+  location.reload();
+ });
+}
+
+function leerProveedores() {
+ $.get("../../ajax/leerProveedores.php", {
+	 
+ }, function(data, status) {
+  $("#proveedores").html(data);
+ });
+}
+
+function eliminarProveedor(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea eliminar el proveedor?");
+
+ if (confirmacion == true) {
+  $.post("../../ajax/eliminarProveedor.php", {
+   idProveedor : id
+  }, function(data, status) {
+   leerProveedores();
+  });
+ }
+}
+
+function cargarProveedor(id) {
+ $.post("../../ajax/cargarProveedor.php", {
+  idProveedor : id
+ }, function(data, status) {
+  $("#mod-actualizar-proveedor").html(data);
+ });
+ $("#mod-actualizar-proveedor").modal("show");
+}
+
+function actualizarProveedor() {
+ var idProveedor = $("#id-proveedor").val();
+ var ruc         = $("#act-ruc").val();
+ var razonSocial = $("#act-razon-social").val();
+ var direccion   = $("#act-direccion").val();
+ var contacto    = $("#act-contacto").val();
+ var telefono    = $("#act-telefono").val();
+ var correo      = $("#act-correo").val();
+
+ $.post("../../ajax/actualizarProveedor.php", {
+  idProveedor : idProveedor, 
+  ruc         : ruc, 
+  razonSocial : razonSocial, 
+  direccion   : direccion, 
+  contacto    : contacto, 
+  telefono    : telefono, 
+  correo      : correo
+ }, function(data, status) {
+  $("#mod-actualizar-proveedor").modal("hide");
+  leerProveedores();
+ });
+}
+/* Inicio Compras */
+function leerCompras() {
+ var idProveedor = $("#proveedor").val();
+ var fechaDesde  = $("#fecha-desde").val();
+ var fechaHasta  = $("#fecha-hasta").val();
+ 
+ $.post("../../ajax/leerCompras.php", {
+  idProveedor : idProveedor, 
+  fechaDesde  : fechaDesde, 
+  fechaHasta  : fechaHasta
+ }, function(data, status) {
+  $("#compras").html(data);
+ });
+}
+
+function cargarCompra(id) {
+ $("#id-compra").val(id);
+
+ $.post("../../ajax/cargarCompra.php", {
+  id: id
+ }, function(data, status) {
+  $("#mod-cargar-compra").html(data);
+  $("#id-compra").val(id);
+ });
+ $("#mod-cargar-compra").modal("show");
+}
+
+function buscarProveedor() {
+ $.post("../../ajax/buscarProveedor.php", {
+  ruc: $("#ruc").val()
+ }, function(data, status) {
+  var proveedor = JSON.parse(data);
+  if(proveedor['status'] == 200) {
+   $("#prv-id").val("0");
+   $("#buscar-no-proveedor").modal("show");
+  } else {
+   $("#prv-id").val(proveedor.id);
+   $("#prv-ruc").val(proveedor.ruc);
+   $("#prv-razon-social").val(proveedor.razon_social);
+   $("#prv-direccion").val(proveedor.direccion);
+   $("#buscar-proveedor").modal("show");
+  }
+ });
+}
+
+function agregarProveedor() {
+ var id          = $("#prv-id").val();
+ var ruc         = $("#prv-ruc").val();
+ var razonSocial = $("#prv-razon-social").val();
+ var direccion   = $("#prv-direccion").val();
+
+ $.post("../../pages/egresos/agregar-compra.php", {
+	 
+ }, function(data, status) {
+  $("#buscar-proveedor").modal("hide");
+
+  $("#id-proveedor").val(id);
+  $("#ruc").val(ruc);
+  $("#razon-social").val(razonSocial);
+  $("#direccion").val(direccion);
+ });
+}
+
+function agregarDetCompra() {
+ var idProducto  = $("#producto").val();
+ var codigo      = $("#codigo").val();
+ var descripcion = $("#descripcion").val();
+ var unMedida    = $("#un_medida").val();
+ var cantidad    = $("#cantidad").val();
+ var costo       = $("#costo").val();
+
+ $.post("../../ajax/agregarDetCompra.php", {
+  idProducto  : idProducto, 
+  codigo      : codigo, 
+  descripcion : descripcion, 
+  unMedida    : unMedida, 
+  cantidad    : cantidad, 
+  costo       : costo
+ }, function(data, status) {
+  $("#mod-agregar-producto").modal("hide");
+  
+  leerDetCompra();
+  
+  $("#producto").val("");
+  $("#cantidad").val("");
+  $("#costo").val("");
+ });
+}
+
+function leerDetCompra() {
+ $.get("../../ajax/leerDetCompra.php", {
+	 
+ }, function(data, status) {
+  $("#detalle-compra").html(data);
+ });
+}
+
+function eliminarDetCompra(id) {
+ var confirmacion = confirm("Esta opción no se puede deshacer, ¿desea eliminar el producto?");
+
+ if (confirmacion == true) {
+  $.post("../../ajax/eliminarDetCompra.php", {
+   idDetCompra : id
+  }, function(data, status) {
+   leerDetCompra();
+  });
+ }
+}
+
+function cargarDetCompra(id) {
+ $.post("../../ajax/cargarDetCompra.php", {
+  idDetCompra : id
+ }, function(data, status) {
+  $("#mod-actualizar-det-compra").html(data);
+ });
+ $("#mod-actualizar-det-compra").modal("show");
+}
+
+function actualizarDetCompra() {
+ var idDetCompra = $("#id-det-compra").val();
+ var cantidad    = $("#act-cantidad").val();
+ var costo       = $("#act-costo").val();
+
+ $.post("../../ajax/actualizarDetCompra.php", {
+  idDetCompra : idDetCompra,
+  cantidad    : cantidad,
+  costo       : costo
+ }, function(data, status) {
+  $("#mod-actualizar-det-compra").modal("hide");
+  leerDetCompra();
+ });
+}
+
+function guardarCompra() {
+ var idProveedor   = $("#id-proveedor").val();
+ var fechaCompra   = $("#fecha-compra").val();
+ var medioPago     = $("#medio-pago").val();
+ var observaciones = $("#observaciones").val();
+ var montoNeto     = $("#monto-neto").val();
+ var montoIGV      = $("#monto-igv").val();
+ var montoTotal    = $("#monto-total").val();
+
+ $.post("../../ajax/guardarCompra.php", {
+  idProveedor   : idProveedor, 
+  fechaCompra   : fechaCompra, 
+  medioPago     : medioPago, 
+  observaciones : observaciones, 
+  montoNeto     : montoNeto, 
+  montoIGV      : montoIGV, 
+  montoTotal    : montoTotal
+ }, function(data, status) {
+  var respuesta = JSON.parse(data);
+  alert(respuesta['mensaje']);
+  if(respuesta['estado']==0) {
+   window.location.reload(true);
+  }
+ });
+}
+
+function guardarCotizacion() {
+ var tipoComprobante  = $("#tipo-comprobante").val();
+ var idCliente        = $("#id-cliente").val();
+ var numeroDocumento  = $("#numero-documento").val();
+ var ordenCompra      = $("#orden-compra").val();
+ var guiaRemision     = $("#guia-remision").val();
+ var condicionPago    = $("#condicion-pago").val();
+ var descMedioPago    = $("#desc-medio-pago").val();
+ var observaciones    = $("#observaciones").val();
+ var montoNeto        = $("#monto-neto").val();
+ var montoIGV         = $("#monto-igv").val();
+ var montoTotal       = $("#monto-total").val();
+ var montoTotalCuotas = $("#monto-total-cuotas").val();
+ 
+ /** Detracción - inicio **/
+ var aplicaDetraccion = $("#aplica-detraccion").val();
+ var bienServicioDet  = $("#bien-servicio-detraccion").val();
+ var medioPagoDet     = $("#medio-pago-detraccion").val();
+ var porcentajeDet    = $("#porcentaje-detraccion").val();
+ var montoDet         = $("#monto-detraccion").val();
+ /** Detracción - fin **/
+ 
+ var medioPago        = [];
+ var montoPagado      = [];
+ for (i = 1; i <= 10; i++) {
+  if (document.getElementById('CB'+i)) {
+   var monto = document.getElementById('MP'+i).value;
+   if (document.getElementById('CB'+i).checked) {
+	medioPago[medioPago.length]     = i;
+	montoPagado[montoPagado.length] = monto;
+   }
+  }
+ }
+
+ $.post('../../ajax/cotizaciones/guardarCotizacion.php', {
+  tipoComprobante : tipoComprobante, 
+  idCliente       : idCliente, 
+  numeroDocumento : numeroDocumento, 
+  ordenCompra     : ordenCompra, 
+  guiaRemision    : guiaRemision, 
+  condicionPago   : condicionPago, 
+  descMedioPago   : descMedioPago, 
+  observaciones   : observaciones, 
+  montoNeto       : montoNeto, 
+  montoIGV        : montoIGV, 
+  montoTotal      : montoTotal, 
+  medioPago       : medioPago, 
+  montoPagado     : montoPagado
+ }, function(data, status) {
+  var respuesta = JSON.parse(data);
+  alert(respuesta['mensaje']);
+  if(respuesta['estado']==0) {
+   window.location.reload(true);
+  }
+ });
+}
+
+function leerCotizaciones() {
+ var codCotizacion = document.getElementById('cot-codigo-cotizacion') ? document.getElementById('cot-codigo-cotizacion').value : '';
+ var numDocumento  = document.getElementById('cot-numero-documento')  ? document.getElementById('cot-numero-documento').value  : '';
+ var fechaDesde    = document.getElementById('cot-fecha-desde')       ? document.getElementById('cot-fecha-desde').value       : '';
+ var fechaHasta    = document.getElementById('cot-fecha-hasta')       ? document.getElementById('cot-fecha-hasta').value       : '';
+ 
+ $.post("../../ajax/cotizaciones/leerCotizaciones.php", {
+  codCotizacion : codCotizacion, 
+  numDocumento  : numDocumento, 
+  fechaDesde    : fechaDesde, 
+  fechaHasta    : fechaHasta
+ }, function(data, status) {
+  if (document.getElementById('cotizaciones')) {
+   document.getElementById('cotizaciones').innerHTML = data;
+  }
+ });
+}
+
+function venderCotizacion() {
+ var idCotizacion    = $("#id-cotizacion").val();
+ var montoTotal      = $("#monto-total").val();
+ var medioPago       = [];
+ var montoPagado     = [];
+ for (i = 1; i <= 10; i++) {
+  if (document.getElementById('CB'+i)) {
+   var monto = document.getElementById('MP'+i).value;
+   if (document.getElementById('CB'+i).checked) {
+	medioPago[medioPago.length]     = i;
+	montoPagado[montoPagado.length] = monto;
+   }
+  }
+ }
+
+ $.post('../../ajax/cotizaciones/venderCotizacion.php', {
+  idCotizacion : idCotizacion, 
+  montoTotal   : montoTotal, 
+  medioPago    : medioPago, 
+  montoPagado  : montoPagado
+ }, function(data, status) {
+  var respuesta = JSON.parse(data);
+  alert(respuesta['mensaje']);
+  if(respuesta['estado']==0) {
+   window.location.reload(true);
+  }
+ });
+}
+
+/* REPORTES */ 
+
+/*Reporte de Ventas Producto */
+function buscarReporteVentasProducto() {
+ var tipoComprobante = $("#tip-comprobante").val();
+ var fechaDesde      = $("#fecha-desde").val();
+ var fechaHasta      = $("#fecha-hasta").val();
+ 
+ $.post("../../ajax/reportes/buscar/buscarReporteVentasProducto.php", {
+  tipoComprobante : tipoComprobante, 
+  fechaDesde      : fechaDesde, 
+  fechaHasta      : fechaHasta
+ }, function(data, status) {
+  $("#reporte-ventas-producto").html(data);
+  $("#rep-tipo-comprobante").val(tipoComprobante);
+  $("#rep-fecha-desde").val(fechaDesde);
+  $("#rep-fecha-hasta").val(fechaHasta);
+ });
+}
+
+/*Reporte de Ventas General */
+function buscarReporteVentasGeneral() {
+ var tipoComprobante = $("#tip-comprobante").val();
+ var fechaDesde      = $("#fecha-desde").val();
+ var fechaHasta      = $("#fecha-hasta").val();
+ 
+ $.post("../../ajax/reportes/buscar/buscarReporteVentasGeneral.php", {
+  tipoComprobante : tipoComprobante, 
+  fechaDesde      : fechaDesde, 
+  fechaHasta      : fechaHasta
+ }, function(data, status) {
+  $("#reporte-ventas-general").html(data);
+  $("#rep-tipo-comprobante").val(tipoComprobante);
+  $("#rep-fecha-desde").val(fechaDesde);
+  $("#rep-fecha-hasta").val(fechaHasta);
+ });
+}
+
+/*Reporte de Compras Producto */
+function buscarReporteComprasProducto() {
+ var proveedor  = $("#proveedor").val();
+ var fechaDesde = $("#fecha-desde").val();
+ var fechaHasta = $("#fecha-hasta").val();
+ 
+ $.post("../../ajax/reportes/buscar/buscarReporteComprasProducto.php", {
+  proveedor  : proveedor, 
+  fechaDesde : fechaDesde, 
+  fechaHasta : fechaHasta
+ }, function(data, status) {
+  $("#reporte-compras-producto").html(data);
+  $("#rep-proveedor").val(proveedor);
+  $("#rep-fecha-desde").val(fechaDesde);
+  $("#rep-fecha-hasta").val(fechaHasta);
+ });
+}
+
+/*Reporte de Compras General */
+function buscarReporteComprasGeneral() {
+ var proveedor  = $("#proveedor").val();
+ var fechaDesde = $("#fecha-desde").val();
+ var fechaHasta = $("#fecha-hasta").val();
+ 
+ $.post("../../ajax/reportes/buscar/buscarReporteComprasGeneral.php", {
+  proveedor  : proveedor, 
+  fechaDesde : fechaDesde, 
+  fechaHasta : fechaHasta
+ }, function(data, status) {
+  $("#reporte-compras-general").html(data);
+  $("#rep-proveedor").val(proveedor);
+  $("#rep-fecha-desde").val(fechaDesde);
+  $("#rep-fecha-hasta").val(fechaHasta);
+ });
+}
+
+/*Reporte de Ingresos Mensual */
+function buscarReporteIngresosMensual() {
+ var mesPeriodo  = $("#mes-periodo").val();
+ var anioPeriodo = $("#anio-periodo").val();
+ 
+ $.post("../../ajax/reportes/buscar/buscarReporteIngresosMensual.php", {
+  mesPeriodo  : mesPeriodo, 
+  anioPeriodo : anioPeriodo
+ }, function(data, status) {
+  $("#reporte-ingresos-mensual").html(data);
+  $("#rep-mes-periodo").val(mesPeriodo);
+  $("#rep-anio-periodo").val(anioPeriodo);
+ });
+}
+
+/*Reporte Detalle Diario */
+function buscarReporteDetalleDiario() {
+ var fechaDetalleDiario  = $("#fecha-detalle-diario").val();
+ 
+ $.post("../../ajax/reportes/buscar/buscarReporteDetalleDiario.php", {
+  fechaDetalleDiario : fechaDetalleDiario 
+ }, function(data, status) {
+  $("#reporte-detalle-diario").html(data);
+  $("#rep-fecha-detalle-diario").val(fechaDetalleDiario);
+ });
+}
